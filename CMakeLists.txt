@@ -5,14 +5,9 @@ set(CMAKE_C_STANDARD 23)
 
 add_compile_options(-Wall)
 add_compile_options(-Wextra)
-add_compile_options(-Weffc++)
 add_compile_options(-Wno-sign-compare)
 add_compile_options(-Wno-unused-function)
 add_compile_options(-Wno-unused-const-variable)
-add_compile_options(-Wno-unused-template)
-add_compile_options(-Wno-c++98-compat)
-add_compile_options(-Wno-c++98-compat-pedantic)
-add_compile_options(-fstandalone-debug)
 
 include_directories(includes)
 
