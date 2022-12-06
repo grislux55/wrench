@@ -9,12 +9,11 @@ add_compile_options(-Wno-sign-compare)
 add_compile_options(-Wno-unused-function)
 add_compile_options(-Wno-unused-const-variable)
 
-include_directories(includes)
+add_subdirectory(src)
 
-file(GLOB_RECURSE ALL_LIBS src/*.c)
-
-add_library(${PROJECT_NAME}_lib SHARED ${ALL_LIBS})
-
-add_executable(${PROJECT_NAME} main.c)
-
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_lib)
+option(BUILD_TEST "Whether or not to build the tests" ON)
+if (${BUILD_TEST})
+    message(STATUS "Configuring tests")
+    enable_testing()  # Enable testing only works in root scope
+    add_subdirectory(tests)
+endif ()
