@@ -12,7 +12,7 @@
  * @return          解码后的数据长度，不能按规则提取出数据则为0
  * @note            函数会根据数据长度自动分配*out的空间
  *                  不会尝试覆盖输出变量的内容，如果*out不为NULL则什么都不会干
- * @par 示例:
+ * @par 示例
  * @code
  *    uint8_t source[] = {0x00, 0xcb, 0x7f, 0xaf, 0x57, 0xe1, 0x02};
  *    uint8_t target[] = {0xca, 0xfe, 0xba, 0xbe};

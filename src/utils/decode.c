@@ -2,7 +2,8 @@
 #include <string.h>
 #include <utils/decode.h>
 
-size_t decode(uint8_t **out, const uint8_t *in, size_t in_len) {
+size_t decode(uint8_t **out, const uint8_t *in, size_t in_len)
+{
     // 传入不需要的数据的时候直接返回防止覆盖
     if (out == NULL || *out != NULL) {
         return 0;
