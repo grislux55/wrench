@@ -1,4 +1,4 @@
-#include <utils/encode.h>
+#include <sm7bit/encode.h>
 
 #include <cassert>
 #include <cstdlib>
