@@ -1,12 +1,12 @@
-#include "utils/encode.h"
+#include <utils/encode.h>
 
-#include <malloc.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
-size_t encode(uint8_t **out, const uint8_t *in, size_t in_len)
+size_t encode(uint8_t *&out, const uint8_t *in, size_t in_len)
 {
     // 传入不需要的数据的时候直接返回防止覆盖
-    if (out == NULL || *out != NULL) {
+    if (out != nullptr) {
         return 0;
     }
 
@@ -18,11 +18,10 @@ size_t encode(uint8_t **out, const uint8_t *in, size_t in_len)
         return 0;
     }
 
-    *out = malloc(target_len);
-    memset(*out, 0, target_len);
-    uint8_t *out_converted = *out;
+    out = static_cast<uint8_t *>(std::malloc(target_len));
+    memset(out, 0, target_len);
 
-    out_converted[0] = 0x00;
+    out[0] = 0x00;
 
     size_t wrote_bit = 8;
     for (size_t i = 0; i < in_len; i++) {
@@ -34,11 +33,11 @@ size_t encode(uint8_t **out, const uint8_t *in, size_t in_len)
             if (wrote_bit % 8 == 7) {
                 // wrote_bit % 8 代表写入哪一位
                 // 每个字节的第8位值置1
-                out_converted[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
+                out[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
                 wrote_bit++;
             }
             if (in[i] & (1 << j)) {
-                out_converted[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
+                out[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
             }
             wrote_bit++;
         }
@@ -46,11 +45,11 @@ size_t encode(uint8_t **out, const uint8_t *in, size_t in_len)
 
     // 空位用1填充
     while (wrote_bit / 8 != target_len - 1) {
-        out_converted[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
+        out[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
         wrote_bit++;
     }
 
-    out_converted[target_len - 1] = 0x02;
+    out[target_len - 1] = 0x02;
 
     return target_len;
 }

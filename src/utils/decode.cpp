@@ -1,11 +1,12 @@
-#include <malloc.h>
-#include <string.h>
 #include <utils/decode.h>
 
-size_t decode(uint8_t **out, const uint8_t *in, size_t in_len)
+#include <cstdlib>
+#include <cstring>
+
+size_t decode(uint8_t *&out, const uint8_t *in, size_t in_len)
 {
     // 传入不需要的数据的时候直接返回防止覆盖
-    if (out == NULL || *out != NULL) {
+    if (out != nullptr) {
         return 0;
     }
 
@@ -36,9 +37,8 @@ size_t decode(uint8_t **out, const uint8_t *in, size_t in_len)
         return 0;
     }
 
-    *out = malloc(target_len);
-    memset(*out, 0, target_len);
-    uint8_t *out_converted = *out;
+    out = static_cast<uint8_t *>(std::malloc(target_len));
+    memset(out, 0, target_len);
 
     size_t wrote_bit = 0;
     for (size_t i = start + 1; i < end; i++) {
@@ -52,7 +52,7 @@ size_t decode(uint8_t **out, const uint8_t *in, size_t in_len)
             if (in[i] & (1 << j)) {
                 // wrote_bit % 8 代表写入到了哪一位
                 // 但是数字里面的位偏移是反过来的，所以用7减去
-                out_converted[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
+                out[wrote_bit / 8] |= 1 << (7 - (wrote_bit % 8));
             }
             wrote_bit++;
             // 写满数据之后直接返回，丢弃剩下用于对齐的数据

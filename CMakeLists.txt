@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
-project(wrench C)
+project(wrench)
 
 set(CMAKE_C_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 
 add_compile_options(-Wall)
 add_compile_options(-Wextra)

@@ -1,8 +1,8 @@
 #ifndef WRENCH_DECODE_H
 #define WRENCH_DECODE_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 /**
  * @brief           将输入的字节序列中的第一段由控制指令包围的数据解码
@@ -17,13 +17,13 @@
  *    uint8_t source[] = {0x00, 0xcb, 0x7f, 0xaf, 0x57, 0xe1, 0x02};
  *    uint8_t target[] = {0xca, 0xfe, 0xba, 0xbe};
  *    uint8_t *decoded = NULL;
- *    size_t decoded_len = decode(&decoded, source, 7);
+ *    size_t decoded_len = decode(decoded, source, 7);
  *    assert(decoded_len == 4);
  *    for (int i = 0; i < decoded_len; i++) {
  *        assert(decoded[i] == target[i]);
  *    }
  * @endcode
  **/
-extern size_t decode(uint8_t **out, const uint8_t *in, size_t in_len);
+extern size_t decode(uint8_t *&out, const uint8_t *in, size_t in_len);
 
-#endif //WRENCH_DECODE_H
+#endif  // WRENCH_DECODE_H
