@@ -7,5 +7,6 @@ foreach (TEST_FILE_PATH ${TEST_FILE_LIST})
 
     add_executable(test_${TARGET_NAME} ${RELATIVE_PATH})
     target_link_libraries(test_${TARGET_NAME} ${PROJECT_NAME}_lib)
+    target_link_libraries(test_${TARGET_NAME} hiredis)
     add_test(NAME test_${TARGET_NAME} COMMAND test_${TARGET_NAME})
 endforeach ()
