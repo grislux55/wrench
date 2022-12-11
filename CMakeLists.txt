@@ -3,7 +3,16 @@ project(wrench)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps;${CMAKE_MODULE_PATH}")
+
+if (EXISTS ${PROJECT_SOURCE_DIR}/build/conan_paths.cmake)
+    include(${PROJECT_SOURCE_DIR}/build/conan_paths.cmake)
+else ()
+    message("conan_paths.cmake not found, fallback to vcpkg")
+endif ()
+
+find_package(hiredis REQUIRED)
+find_package(tomlplusplus REQUIRED)
+find_package(GTest REQUIRED)
 
 add_compile_options(-Wall)
 add_compile_options(-Wextra)
@@ -12,9 +21,6 @@ add_compile_options(-Wno-unused-function)
 add_compile_options(-Wno-unused-const-variable)
 
 add_subdirectory(src)
-
-include(hiredis)
-include(tomlplusplus)
 
 option(BUILD_TEST "Whether or not to build the tests" ON)
 if (${BUILD_TEST})

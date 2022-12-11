@@ -1,0 +1,8 @@
+[requires]
+tomlplusplus/3.2.0
+hiredis/1.1.0
+gtest/1.12.1
+
+[generators]
+cmake_find_package
+cmake_paths

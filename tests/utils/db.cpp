@@ -1,16 +1,10 @@
-#include <cstdio>
-#include <hiredis.h>
+#include <gtest/gtest.h>
+#include <hiredis/hiredis.h>
 
-int main()
+TEST(UtilsDb, BasicConnect)
 {
     redisContext *c = redisConnect("120.76.201.111", 6379);
-    if (c == NULL || c->err) {
-        if (c) {
-            printf("Error: %s\n", c->errstr);
-            // handle error
-        } else {
-            printf("Can't allocate redis context\n");
-        }
-    }
-    return 0;
+    ASSERT_NE(c, nullptr);
+    ASSERT_EQ(c->err, 0);
+    redisFree(c);
 }
