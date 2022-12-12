@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
+#include <toml++/toml.h>
 
 #include <filesystem>
 #include <iostream>
-#include <toml.hpp>
 
 constexpr std::string_view DATA =
     "[database]\n"

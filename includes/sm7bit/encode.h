@@ -28,4 +28,4 @@
 
 extern size_t encode(uint8_t *&out, const uint8_t *in, size_t in_len);
 
-#endif //WRENCH_ENCODE_H
+#endif  // WRENCH_ENCODE_H

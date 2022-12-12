@@ -1,5 +1,5 @@
-#include <sm7bit/encode.h>
 #include <gtest/gtest.h>
+#include <sm7bit/encode.h>
 
 TEST(SM7BitEncode, BasicAssertions)
 {

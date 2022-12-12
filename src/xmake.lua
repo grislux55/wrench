@@ -1,0 +1,5 @@
+target("wrench_lib",function () 
+    set_kind("static")
+    add_files("./*/*.cpp")
+    add_includedirs("../includes")
+end)

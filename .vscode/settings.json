@@ -1,0 +1,10 @@
+{
+    "xmake.compileCommandsDirectory": ".",
+    "lldb.showDisassembly": "auto",
+    "lldb.dereferencePointers": true,
+    "lldb.consoleMode": "commands",
+    "xmake.debugConfigType": "codelldb",
+    "clangd.arguments": [
+        "-header-insertion=never"
+    ]
+}

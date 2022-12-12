@@ -1,19 +1,15 @@
-CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
+# Visual Studio Code
+/.vscode/*
+!.vscode/extensions.json
+!/.vscode/settings.json
+
+# MacOS Cache
+.DS_Store
+
+# clangd cache
+.cache/
 compile_commands.json
-CTestTestfile.cmake
-_deps
-cmake-build-relwithdebinfo
-cmake-build-debug
-cmake-build-release
-cmake-build-minsizerel
-cmake-build-default
-.idea
-.vscode
+
+# Xmake cache
+.xmake
 build
