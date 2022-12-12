@@ -1,5 +1,5 @@
-target("wrench_lib",function () 
+target("wrench_lib", function ()
     set_kind("static")
-    add_files("./*/*.cpp")
     add_includedirs("../includes")
+    add_files("**.cpp")
 end)
