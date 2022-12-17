@@ -17,3 +17,12 @@ TEST(ConfParse, BasicRead)
     ASSERT_EQ(ip, "120.76.201.111");
     ASSERT_EQ(ports, 6379);
 }
+
+TEST(ConfParse, FileRead)
+{
+    auto config = toml::parse_file("conf/resources/conf.toml");
+    std::string_view ip = config["database"]["ip"].value_or("");
+    int64_t ports = config["database"]["ports"].value_or(0);
+    ASSERT_EQ(ip, "120.76.201.111");
+    ASSERT_EQ(ports, 6379);
+}

@@ -8,8 +8,6 @@ add_rules("mode.release", "mode.debug")
 
 add_cxxflags("-Wall","-Wextra","-Wno-sign-compare","-Wno-unused-function","-Wno-unused-const-variable")
 
-add_requires("hiredis 1.0.2")
-add_requires("toml++ 3.2.0")
-add_requires("gtest 1.12.1")
+add_requires("hiredis 1.0.2", "toml++ 3.2.0", "gtest 1.12.1", "argparse 2.6.0")
 
-includes("src", "tests")
+includes("lib", "src", "tests")
