@@ -1,8 +1,8 @@
 #ifndef WRENCH_PACKET_H
 #define WRENCH_PACKET_H
 
-#include <wrc/joint.h>
-#include <wrc/payload.h>
+#include <hardware/wrc/joint.h>
+#include <hardware/wrc/payload.h>
 
 enum WRC_Packet_Direction {
     WRC_Packet_Direction_FromClient = 0,  // 此数据包由客户端发至服务端
