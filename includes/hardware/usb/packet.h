@@ -1,9 +1,13 @@
-#ifndef WRENCH_HARDWARE_USB_PACKET_H
+﻿#ifndef WRENCH_HARDWARE_USB_PACKET_H
 #define WRENCH_HARDWARE_USB_PACKET_H
 
 #include <hardware/usb/payload.h>
 
 #include <cstdint>
+#ifdef _MSC_VER
+#define ATTR_PACKED
+#pragma pack(push, 1)
+#endif
 
 enum USBLocal_Packet_Type {
     USBLocal_Packet_Type_Unknown = 0,
@@ -24,4 +28,7 @@ typedef struct {
     USBLocal_Payload payload;
 } ATTR_PACKED USBLocal_Packet;
 
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 #endif  // WRENCH_HARDWARE_USB_PACKET_H

@@ -1,4 +1,4 @@
-#ifndef WRENCH_USB_PACKET_H
+﻿#ifndef WRENCH_USB_PACKET_H
 #define WRENCH_USB_PACKET_H
 
 #include <hardware/usb/packet.h>

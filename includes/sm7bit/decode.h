@@ -1,4 +1,4 @@
-#ifndef WRENCH_SM7BIT_DECODE_H
+﻿#ifndef WRENCH_SM7BIT_DECODE_H
 #define WRENCH_SM7BIT_DECODE_H
 
 #include <cstddef>

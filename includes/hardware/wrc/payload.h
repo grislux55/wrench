@@ -1,8 +1,14 @@
-#ifndef WRENCH_HARDWARE_WRC_PAYLOAD_H
+﻿#ifndef WRENCH_HARDWARE_WRC_PAYLOAD_H
 #define WRENCH_HARDWARE_WRC_PAYLOAD_H
 
 #include <cstdint>
+#ifdef __GNUC__
 #define ATTR_PACKED __attribute__((packed))
+#endif
+#ifdef _MSC_VER
+#define ATTR_PACKED
+#pragma pack(push, 1)
+#endif
 
 typedef struct {
     uint8_t serial[16];  // 以二进制方式存储，节省空间和带宽
@@ -103,4 +109,7 @@ typedef struct {
     } flag;
 } ATTR_PACKED WRC_Payload_GetInfo;
 
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 #endif  // WRENCH_HARDWARE_WRC_PAYLOAD_H

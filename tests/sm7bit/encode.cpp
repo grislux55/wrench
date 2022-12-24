@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include <sm7bit/encode.h>
 
 TEST(SM7BitEncode, BasicAssertions)
@@ -15,7 +15,7 @@ TEST(SM7BitEncode, BasicAssertions)
 
 TEST(SM7BitEncode, EmptyAssertions)
 {
-    uint8_t source[] = {};
+    uint8_t *source = nullptr;
     uint8_t target[] = {0x00, 0x02};
     uint8_t *encoded = nullptr;
     size_t encoded_len = encode(encoded, source, 0);

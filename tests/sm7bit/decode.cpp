@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include <sm7bit/decode.h>
 
 TEST(SM7BitDecode, BasicAssertions)
@@ -15,7 +15,7 @@ TEST(SM7BitDecode, BasicAssertions)
 
 TEST(SM7BitDecode, EmptyAssertions)
 {
-    uint8_t source[] = {};
+    uint8_t *source = nullptr;
     uint8_t *decoded = nullptr;
     size_t decoded_len = decode(decoded, source, 0);
     ASSERT_EQ(decoded_len, 0);

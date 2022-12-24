@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include <wrc/packet.h>
 
 TEST(WRCPacket, BasicInit)

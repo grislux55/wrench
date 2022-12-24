@@ -1,4 +1,4 @@
-#include <sm7bit/decode.h>
+﻿#include <sm7bit/decode.h>
 
 #include <cstdlib>
 #include <cstring>

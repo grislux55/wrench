@@ -1,8 +1,14 @@
-#ifndef WRENCH_HARDWARE_USB_PAYLOAD_H
+﻿#ifndef WRENCH_HARDWARE_USB_PAYLOAD_H
 #define WRENCH_HARDWARE_USB_PAYLOAD_H
 
 #include <cstdint>
+#ifdef __GNUC__
 #define ATTR_PACKED __attribute__((packed))
+#endif
+#ifdef _MSC_VER
+#define ATTR_PACKED
+#pragma pack(push, 1)
+#endif
 
 typedef struct {
     int8_t rssi, snr, rscp;  // 信号强度，信噪比，解扩后的信号强度（LoRa）
@@ -23,4 +29,7 @@ typedef struct {
     uint8_t mode;
 } ATTR_PACKED USBLocal_Payload_MACMode;
 
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 #endif  // WRENCH_HARDWARE_USB_PAYLOAD_H

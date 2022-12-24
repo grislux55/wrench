@@ -1,4 +1,4 @@
-#ifndef WRENCH_HARDWARE_WRC_JOINT_H
+﻿#ifndef WRENCH_HARDWARE_WRC_JOINT_H
 #define WRENCH_HARDWARE_WRC_JOINT_H
 
 enum WRC_JointData_Mode {

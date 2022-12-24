@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include <usb/packet.h>
 
 TEST(USBLocalPacket, BasicInit)

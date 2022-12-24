@@ -1,8 +1,12 @@
-#ifndef WRENCH_HARDWARE_WRC_PACKET_H
+﻿#ifndef WRENCH_HARDWARE_WRC_PACKET_H
 #define WRENCH_HARDWARE_WRC_PACKET_H
 
 #include <hardware/wrc/joint.h>
 #include <hardware/wrc/payload.h>
+#ifdef _MSC_VER
+#define ATTR_PACKED
+#pragma pack(push, 1)
+#endif
 
 enum WRC_Packet_Direction {
     WRC_Packet_Direction_FromClient = 0,  // 此数据包由客户端发至服务端
@@ -56,4 +60,7 @@ typedef struct {
     WRC_Payload payload;
 } ATTR_PACKED WRC_Packet;
 
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 #endif  // WRENCH_HARDWARE_WRC_PACKET_H

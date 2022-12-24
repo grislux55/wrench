@@ -1,4 +1,4 @@
-#ifndef WRENCH_WRC_PACKET_H
+﻿#ifndef WRENCH_WRC_PACKET_H
 #define WRENCH_WRC_PACKET_H
 
 #include <hardware/wrc/packet.h>
