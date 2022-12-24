@@ -1,5 +1,5 @@
-#ifndef WRENCH_TYPE_H
-#define WRENCH_TYPE_H
+#ifndef WRENCH_HARDWARE_SM7BIT_TYPE_H
+#define WRENCH_HARDWARE_SM7BIT_TYPE_H
 
 enum {
     SM7Bit_StartByte_USBLocal = 0x02,
@@ -7,4 +7,4 @@ enum {
     SM7Bit_EndByte = 0x80,
 };
 
-#endif  // WRENCH_TYPE_H
+#endif  // WRENCH_HARDWARE_SM7BIT_TYPE_H

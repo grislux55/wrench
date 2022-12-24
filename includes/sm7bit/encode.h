@@ -1,8 +1,9 @@
-#ifndef WRENCH_ENCODE_H
-#define WRENCH_ENCODE_H
+#ifndef WRENCH_SM7BIT_ENCODE_H
+#define WRENCH_SM7BIT_ENCODE_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 /**
  * @brief               将输入信息序列进行编码
@@ -26,6 +27,12 @@
  * @endcode
  */
 
-extern size_t encode(uint8_t *&out, const uint8_t *in, size_t in_len);
+extern size_t encode(uint8_t *&out, const uint8_t *const in, size_t in_len);
 
-#endif  // WRENCH_ENCODE_H
+class IEncodable
+{
+   public:
+    virtual std::vector<uint8_t> encode() = 0;
+};
+
+#endif  // WRENCH_SM7BIT_ENCODE_H

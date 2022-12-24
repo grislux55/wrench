@@ -1,5 +1,5 @@
-#ifndef WRENCH_DECODE_H
-#define WRENCH_DECODE_H
+#ifndef WRENCH_SM7BIT_DECODE_H
+#define WRENCH_SM7BIT_DECODE_H
 
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +24,6 @@
  *    }
  * @endcode
  **/
-extern size_t decode(uint8_t *&out, const uint8_t *in, size_t in_len);
+extern size_t decode(uint8_t *&out, const uint8_t *const in, size_t in_len);
 
-#endif  // WRENCH_DECODE_H
+#endif  // WRENCH_SM7BIT_DECODE_H

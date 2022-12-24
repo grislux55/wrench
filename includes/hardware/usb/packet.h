@@ -1,5 +1,5 @@
-#ifndef WRENCH_PACKET_H
-#define WRENCH_PACKET_H
+#ifndef WRENCH_HARDWARE_USB_PACKET_H
+#define WRENCH_HARDWARE_USB_PACKET_H
 
 #include <cstdint>
 #define ATTR_PACKED __attribute__((packed))
@@ -40,4 +40,4 @@ typedef struct {
     } payload;
 } ATTR_PACKED USBLocal_Packet;
 
-#endif  // WRENCH_PACKET_H
+#endif  // WRENCH_HARDWARE_USB_PACKET_H

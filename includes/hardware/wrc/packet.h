@@ -1,5 +1,5 @@
-#ifndef WRENCH_PACKET_H
-#define WRENCH_PACKET_H
+#ifndef WRENCH_HARDWARE_WRC_PACKET_H
+#define WRENCH_HARDWARE_WRC_PACKET_H
 
 #include <hardware/wrc/joint.h>
 #include <hardware/wrc/payload.h>
@@ -28,6 +28,23 @@ enum WRC_Packet_Type {
     WRC_Packet_Type_InlineJointData,
 };
 
+typedef union {
+    WRC_Payload_Info_Generic info_general;
+    WRC_Payload_Info_Serial info_serial;
+    WRC_Payload_Info_Timing info_timing;
+    WRC_Payload_Info_Energy info_energy;
+    WRC_Payload_Info_Network info_network;
+    WRC_Payload_SetJoint set_joint;
+    WRC_Payload_SetWrenchTime set_wrench_time;
+    WRC_Payload_GetJointData get_joint_data;
+    WRC_Payload_GetInfo get_info;
+    // TODO: Unknown payload type. CHECK documents.
+    // WRC_Payload_JointData joint_data;
+    WRC_Payload_InlineJointData inline_joint_data;
+    WRC_Payload_StatusReport status_report;
+    uint8_t data[240];  // payload 最长 240 字节
+} WRC_Payload;
+
 typedef struct {
     uint16_t sequence_id;      // 数据包序列号
     uint32_t mac;              // MAC 地址，客户端上电后随机生成
@@ -36,22 +53,7 @@ typedef struct {
                                // 长度的整数倍）
     uint8_t type : 6;          // 数据包类型
     uint8_t payload_len;       // payload 总长度
-    union {
-        WRC_Payload_Info_Generic info_general;
-        WRC_Payload_Info_Serial info_serial;
-        WRC_Payload_Info_Timing info_timing;
-        WRC_Payload_Info_Energy info_energy;
-        WRC_Payload_Info_Network info_network;
-        WRC_Payload_SetJoint set_joint;
-        WRC_Payload_SetWrenchTime set_wrench_time;
-        WRC_Payload_GetJointData get_joint_data;
-        WRC_Payload_GetInfo get_info;
-        // TODO: Unknown payload type. CHECK documents.
-        // WRC_Payload_JointData joint_data;
-        WRC_Payload_InlineJointData inline_joint_data;
-        WRC_Payload_StatusReport status_report;
-        uint8_t data[240];  // payload 最长 240 字节
-    } payload;
+    WRC_Payload payload;
 } ATTR_PACKED WRC_Packet;
 
-#endif  // WRENCH_PACKET_H
+#endif  // WRENCH_HARDWARE_WRC_PACKET_H

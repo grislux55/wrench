@@ -1,5 +1,5 @@
-#ifndef WRENCH_JOINT_H
-#define WRENCH_JOINT_H
+#ifndef WRENCH_HARDWARE_WRC_JOINT_H
+#define WRENCH_HARDWARE_WRC_JOINT_H
 
 enum WRC_JointData_Mode {
     WRC_JointData_Mode_Torque = 0,   // "torque"
@@ -29,4 +29,4 @@ enum WRC_Status {
     WRC_Status_GetJoint_RangeError,  // 获取 Joint 失败 - 范围错误
 };
 
-#endif  // WRENCH_JOINT_H
+#endif  // WRENCH_HARDWARE_WRC_JOINT_H

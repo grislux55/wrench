@@ -1,5 +1,5 @@
-#ifndef WRENCH_PAYLOAD_H
-#define WRENCH_PAYLOAD_H
+#ifndef WRENCH_HARDWARE_WRC_PAYLOAD_H
+#define WRENCH_HARDWARE_WRC_PAYLOAD_H
 
 #include <cstdint>
 #define ATTR_PACKED __attribute__((packed))
@@ -103,4 +103,4 @@ typedef struct {
     } flag;
 } ATTR_PACKED WRC_Payload_GetInfo;
 
-#endif  // WRENCH_PAYLOAD_H
+#endif  // WRENCH_HARDWARE_WRC_PAYLOAD_H
