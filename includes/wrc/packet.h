@@ -1,57 +1,89 @@
-#ifndef WRENCH_PACKET_H
-#define WRENCH_PACKET_H
+#ifndef WRENCH_WRC_PACKET_H
+#define WRENCH_WRC_PACKET_H
 
-#include <wrc/joint.h>
-#include <wrc/payload.h>
+#include <hardware/wrc/packet.h>
+#include <sm7bit/decode.h>
+#include <sm7bit/encode.h>
 
-enum WRC_Packet_Direction {
-    WRC_Packet_Direction_FromClient = 0,  // 此数据包由客户端发至服务端
-    WRC_Packet_Direction_FromServer = 1  // 此数据包由服务端发至客户端
+#include <cstring>
+
+class WRCPacket : public IEncodable
+{
+   private:
+    WRC_Packet data;
+
+   public:
+    virtual std::vector<uint8_t> encode();
+
+    WRCPacket()
+    {
+        memset(&data, 0, sizeof(WRC_Packet));
+    }
+    WRCPacket(const uint8_t *const in, size_t in_len);
+    WRCPacket(const std::vector<uint8_t> &in);
+
+    uint16_t get_sequence_id()
+    {
+        return this->data.sequence_id;
+    }
+    void set_sequence_id(uint16_t sequence_id)
+    {
+        this->data.sequence_id = sequence_id;
+    }
+
+    uint32_t get_mac()
+    {
+        return this->data.mac;
+    }
+    void set_mac(uint32_t mac)
+    {
+        this->data.mac = mac;
+    }
+
+    uint8_t get_direction()
+    {
+        return this->data.direction;
+    }
+    void set_direction(uint8_t direction)
+    {
+        this->data.direction = direction & 1;
+    }
+
+    uint8_t get_variable_len()
+    {
+        return this->data.variable_len;
+    }
+    void set_variable_len(uint8_t variable_len)
+    {
+        this->data.variable_len = variable_len & 1;
+    }
+
+    uint8_t get_type()
+    {
+        return this->data.type;
+    }
+    void set_type(uint8_t type)
+    {
+        this->data.type = type & 0x3F;
+    }
+
+    uint8_t get_payload_len()
+    {
+        return this->data.payload_len;
+    }
+    void set_payload_len(uint8_t payload_len)
+    {
+        this->data.payload_len = payload_len;
+    }
+
+    WRC_Payload &get_payload()
+    {
+        return this->data.payload;
+    }
+    void set_payload(const WRC_Payload &payload)
+    {
+        memcpy(&this->data.payload, &payload, sizeof(WRC_Payload));
+    }
 };
 
-enum WRC_Packet_Type {
-    WRC_Packet_Type_Unknown = 0,
-    WRC_Packet_Type_Info_Generic,
-    WRC_Packet_Type_Info_Serial,
-    WRC_Packet_Type_Info_Timing,
-    WRC_Packet_Type_Info_Energy,
-    WRC_Packet_Type_Info_Network,
-    WRC_Packet_Type_GetInfo,
-    WRC_Packet_Type_SetJoint,
-    WRC_Packet_Type_SetWrenchTime,
-    WRC_Packet_Type_GetJointData,
-    WRC_Packet_Type_ClearJointData,
-    WRC_Packet_Type_GetStatusReport,
-    WRC_Packet_Type_Beep,
-    WRC_Packet_Type_JointData,
-    WRC_Packet_Type_StatusReport,
-    WRC_Packet_Type_InlineJointData,
-};
-
-typedef struct {
-    uint16_t sequence_id;      // 数据包序列号
-    uint32_t mac;              // MAC 地址，客户端上电后随机生成
-    uint8_t direction : 1;     // 方向，
-    uint8_t variable_len : 1;  // 当前 payload 为变长（为 1 个 payload
-                               // 长度的整数倍）
-    uint8_t type : 6;          // 数据包类型
-    uint8_t payload_len;       // payload 总长度
-    union {
-        WRC_Payload_Info_Generic info_general;
-        WRC_Payload_Info_Serial info_serial;
-        WRC_Payload_Info_Timing info_timing;
-        WRC_Payload_Info_Energy info_energy;
-        WRC_Payload_Info_Network info_network;
-        WRC_Payload_SetJoint set_joint;
-        WRC_Payload_SetWrenchTime set_wrench_time;
-        WRC_Payload_GetJointData get_joint_data;
-        WRC_Payload_GetInfo get_info;
-        // TODO: Unknown payload type. CHECK documents.
-        // WRC_Payload_JointData joint_data;
-        WRC_Payload_InlineJointData inline_joint_data;
-        WRC_Payload_StatusReport status_report;
-        uint8_t data[240];  // payload 最长 240 字节
-    } payload;
-} ATTR_PACKED WRC_Packet;
-
-#endif  // WRENCH_PACKET_H
+#endif  // WRENCH_WRC_PACKET_H

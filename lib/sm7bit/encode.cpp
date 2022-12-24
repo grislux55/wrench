@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
-size_t encode(uint8_t *&out, const uint8_t *in, size_t in_len)
+size_t encode(uint8_t *&out, const uint8_t *const in, size_t in_len)
 {
     // 传入不需要的数据的时候直接返回防止覆盖
     if (out != nullptr) {
