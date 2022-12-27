@@ -8,7 +8,7 @@ TEST(SM7BitEncode, BasicAssertions)
     uint8_t *encoded = nullptr;
     size_t encoded_len = encode(encoded, source, 4);
     ASSERT_EQ(encoded_len, 7);
-    for (int i = 0; i < encoded_len; i++) {
+    for (size_t i = 0; i < encoded_len; i++) {
         ASSERT_EQ(encoded[i], target[i]);
     }
 }
@@ -20,7 +20,7 @@ TEST(SM7BitEncode, EmptyAssertions)
     uint8_t *encoded = nullptr;
     size_t encoded_len = encode(encoded, source, 0);
     ASSERT_EQ(encoded_len, 2);
-    for (int i = 0; i < encoded_len; i++) {
+    for (size_t i = 0; i < encoded_len; i++) {
         ASSERT_EQ(encoded[i], target[i]);
     }
 }

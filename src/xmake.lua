@@ -1,5 +1,5 @@
 target("wrench_deamon", function ()
-    add_packages("argparse", "hiredis", "toml++")
+    add_packages("argparse", "hiredis", "toml++", "spdlog")
     add_deps("wrench_lib")
     add_includedirs("$(projectdir)/includes")
     add_files("**.cpp")

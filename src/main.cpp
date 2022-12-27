@@ -1,3 +1,6 @@
+#include <spdlog/spdlog.h>
+#include <toml++/toml.h>
+
 #include <argparse/argparse.hpp>
 
 constexpr char const* program_name = "wrench_deamon";
@@ -15,7 +18,16 @@ std::string get_version()
 
 int main(int argc, char* argv[])
 {
-    argparse::ArgumentParser program(program_name, get_version());
+#ifndef NDEBUG
+    spdlog::set_level(spdlog::level::debug);
+#endif  // NDEBUG
+
+    static const auto version = get_version();
+    argparse::ArgumentParser program(program_name, version);
+
+    program.add_argument("--config", "-c")
+        .required()
+        .help("specify the configuration file path");
 
     try {
         program.parse_args(argc, argv);
@@ -24,4 +36,10 @@ int main(int argc, char* argv[])
         std::cerr << program;
         std::exit(1);
     }
+
+    spdlog::debug("current version is {}", version);
+
+    auto config_path = program.get("-c");
+    auto config = toml::parse_file(config_path);
+    spdlog::debug("configuration path is {}", config_path);
 }

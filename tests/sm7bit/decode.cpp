@@ -8,7 +8,7 @@ TEST(SM7BitDecode, BasicAssertions)
     uint8_t *decoded = nullptr;
     size_t decoded_len = decode(decoded, source, 7);
     ASSERT_EQ(decoded_len, 4);
-    for (int i = 0; i < decoded_len; i++) {
+    for (size_t i = 0; i < decoded_len; i++) {
         ASSERT_EQ(decoded[i], target[i]);
     }
 }
