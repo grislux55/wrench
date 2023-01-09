@@ -37,7 +37,7 @@ size_t decode(uint8_t *&out, const uint8_t *const in, size_t in_len)
         return 0;
     }
 
-    out = static_cast<uint8_t *>(std::malloc(target_len));
+    out = reinterpret_cast<uint8_t *>(std::malloc(target_len));
     memset(out, 0, target_len);
 
     size_t wrote_bit = 0;
