@@ -1,8 +1,5 @@
 ﻿#include <sm7bit/encode.h>
 
-#include <cstdlib>
-#include <cstring>
-
 size_t encode(uint8_t *&out, const uint8_t *const in, size_t in_len)
 {
     // 传入不需要的数据的时候直接返回防止覆盖
@@ -18,8 +15,8 @@ size_t encode(uint8_t *&out, const uint8_t *const in, size_t in_len)
         return 0;
     }
 
-    out = reinterpret_cast<uint8_t *>(std::malloc(target_len));
-    memset(out, 0, target_len);
+    out = new uint8_t[target_len];
+    std::fill(out, out + target_len, 0);
 
     out[0] = 0x00;
 

@@ -25,7 +25,7 @@ TEST(SM7BitDecode, EmptyAssertions)
 TEST(SM7BitDecode, IllegalAssertions)
 {
     uint8_t source[] = {0x00, 0xcb, 0x7f, 0xaf, 0x57, 0xe1, 0x02};
-    auto *decoded = (uint8_t *)std::malloc(1);
+    uint8_t *decoded = new uint8_t[1];
     size_t decoded_len = decode(decoded, source, 7);
     ASSERT_EQ(decoded_len, 0);
     free(decoded);

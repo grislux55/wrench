@@ -28,7 +28,7 @@ TEST(SM7BitEncode, EmptyAssertions)
 TEST(SM7BitEncode, IllegalAssertions)
 {
     uint8_t source[] = {0xca, 0xfe, 0xba, 0xbe};
-    auto *encoded = (uint8_t *)std::malloc(1);
+    uint8_t *encoded = new uint8_t[1];
     size_t encoded_len = encode(encoded, source, 4);
     ASSERT_EQ(encoded_len, 0);
     free(encoded);

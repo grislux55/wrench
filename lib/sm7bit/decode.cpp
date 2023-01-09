@@ -1,7 +1,6 @@
 ﻿#include <sm7bit/decode.h>
 
-#include <cstdlib>
-#include <cstring>
+#include <algorithm>
 
 size_t decode(uint8_t *&out, const uint8_t *const in, size_t in_len)
 {
@@ -37,8 +36,8 @@ size_t decode(uint8_t *&out, const uint8_t *const in, size_t in_len)
         return 0;
     }
 
-    out = reinterpret_cast<uint8_t *>(std::malloc(target_len));
-    memset(out, 0, target_len);
+    out = new uint8_t[target_len];
+    std::fill(out, out + target_len, 0);
 
     size_t wrote_bit = 0;
     for (size_t i = start + 1; i < end; i++) {

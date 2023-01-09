@@ -5,8 +5,6 @@
 #include <sm7bit/decode.h>
 #include <sm7bit/encode.h>
 
-#include <cstring>
-
 class WRCPacket : public IEncodable
 {
    private:
@@ -17,7 +15,8 @@ class WRCPacket : public IEncodable
 
     WRCPacket()
     {
-        memset(&data, 0, sizeof(WRC_Packet));
+        uint8_t *data_ptr = reinterpret_cast<uint8_t *>(&this->data);
+        std::fill(data_ptr, data_ptr + sizeof(WRC_Packet), 0);
     }
     WRCPacket(const uint8_t *const in, size_t in_len);
     WRCPacket(const std::vector<uint8_t> &in);
@@ -82,7 +81,9 @@ class WRCPacket : public IEncodable
     }
     void set_payload(const WRC_Payload &payload)
     {
-        memcpy(&this->data.payload, &payload, sizeof(WRC_Payload));
+        const uint8_t *data_ptr = reinterpret_cast<const uint8_t *>(&payload);
+        uint8_t *dest_ptr = reinterpret_cast<uint8_t *>(&this->data.payload);
+        std::copy(data_ptr, data_ptr + sizeof(WRC_Payload), dest_ptr);
     }
 };
 

@@ -5,8 +5,6 @@
 #include <sm7bit/decode.h>
 #include <sm7bit/encode.h>
 
-#include <cstring>
-
 class USBLocalPacket : public IEncodable
 {
    private:
@@ -17,7 +15,8 @@ class USBLocalPacket : public IEncodable
 
     USBLocalPacket()
     {
-        memset(&data, 0, sizeof(USBLocal_Packet));
+        uint8_t *data_ptr = reinterpret_cast<uint8_t *>(&this->data);
+        std::fill(data_ptr, data_ptr + sizeof(USBLocal_Packet), 0);
     }
     USBLocalPacket(const uint8_t *const in, size_t in_len);
     USBLocalPacket(const std::vector<uint8_t> &in);
@@ -46,7 +45,9 @@ class USBLocalPacket : public IEncodable
     }
     void set_payload(const USBLocal_Payload &payload)
     {
-        memcpy(&this->data.payload, &payload, sizeof(USBLocal_Payload));
+        const uint8_t *data_ptr = reinterpret_cast<const uint8_t *>(&payload);
+        uint8_t *dest_ptr = reinterpret_cast<uint8_t *>(&this->data.payload);
+        std::copy(data_ptr, data_ptr + sizeof(USBLocal_Payload), dest_ptr);
     }
 };
 
