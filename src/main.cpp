@@ -1,18 +1,13 @@
-#include <spdlog/spdlog.h>
-#include <toml++/toml.h>
+#include "configuration.h"
+#include "pch.h"
 
-#include <argparse/argparse.hpp>
-
-constexpr char const* program_name = "wrench_deamon";
-constexpr int version_major = 0;
-constexpr int version_minor = 0;
-constexpr int version_patch = 0;
-
-std::string get_version()
+std::string_view get_version()
 {
-    static const std::string version = std::to_string(version_major) + "." +
-                                       std::to_string(version_minor) + "." +
-                                       std::to_string(version_patch);
+    constexpr int version_major = 0;
+    constexpr int version_minor = 0;
+    constexpr int version_patch = 0;
+    static const std::string version = fmt::format(
+        FMT_COMPILE("{}.{}.{}"), version_major, version_minor, version_patch);
     return version;
 }
 
@@ -22,8 +17,9 @@ int main(int argc, char* argv[])
     spdlog::set_level(spdlog::level::debug);
 #endif  // NDEBUG
 
-    static const auto version = get_version();
-    argparse::ArgumentParser program(program_name, version);
+    constexpr std::string_view program_name = "wrench_deamon";
+    argparse::ArgumentParser program(std::string{program_name},
+                                     std::string{get_version()});
 
     program.add_argument("--config", "-c")
         .required()
@@ -32,14 +28,21 @@ int main(int argc, char* argv[])
     try {
         program.parse_args(argc, argv);
     } catch (const std::runtime_error& err) {
-        std::cerr << err.what() << std::endl;
-        std::cerr << program;
+        fmt::print(stderr, "{}\n{}", err.what(), program.help().str());
         std::exit(1);
     }
 
-    spdlog::debug("current version is {}", version);
+    spdlog::debug("current version is {}", get_version());
 
     auto config_path = program.get("-c");
-    auto config = toml::parse_file(config_path);
     spdlog::debug("configuration path is {}", config_path);
+
+    AppConfig config;
+    try {
+        auto parsed_config = toml::parse_file(config_path);
+        config = load_config(parsed_config);
+    } catch (const std::runtime_error& err) {
+        fmt::print(stderr, "configuration invalid, reason: {}", err.what());
+        std::exit(1);
+    }
 }
