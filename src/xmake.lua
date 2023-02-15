@@ -1,5 +1,5 @@
 target("wrench_deamon", function ()
-    add_packages("argparse", "hiredis", "toml++", "spdlog", "fmt", "redis-plus-plus")
+    add_packages("argparse", "hiredis", "toml++", "spdlog", "fmt", "redis-plus-plus", "concurrencpp")
     add_deps("wrench_lib")
     add_includedirs("$(projectdir)/includes", "./includes")
     set_pcxxheader("includes/pch.h")

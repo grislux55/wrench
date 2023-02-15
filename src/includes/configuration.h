@@ -11,6 +11,6 @@ typedef struct {
     std::string redis_queue;
 } AppConfig;
 
-extern AppConfig load_config(toml::parse_result res);
+extern AppConfig load_config(toml::parse_result &&res);
 
 #endif  // WRENCH_DEAMON_CONFIGURATION_H
