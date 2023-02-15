@@ -1,0 +1,4 @@
+[database]
+ip = "120.76.201.111"
+port = 6379
+queue = "jeecg_redis_topic"

@@ -11,5 +11,8 @@ add_requires("gtest 1.12.1")
 add_requires("hiredis 1.0.2")
 add_requires("toml++ 3.2.0")
 add_requires("spdlog v1.11.0")
+add_requires("fmt 9.1.0")
+add_requires("redis-plus-plus 1.3.7")
+add_requires("concurrencpp 0.1.5")
 
 includes("lib", "src", "tests")

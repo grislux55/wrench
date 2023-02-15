@@ -1,30 +1,19 @@
-#include <spdlog/spdlog.h>
-#include <toml++/toml.h>
+#include <com/wrench.h>
 
-#include <argparse/argparse.hpp>
+#include <chrono>
+#include <mutex>
 
-constexpr char const* program_name = "wrench_deamon";
-constexpr int version_major = 0;
-constexpr int version_minor = 0;
-constexpr int version_patch = 0;
+#include "configuration.h"
+#include "pch.h"
 
-std::string get_version()
+using namespace std::chrono_literals;
+
+constexpr semver::version version{0, 0, 0};
+constexpr std::string_view program_name = "wrench_deamon";
+
+void make_arguments(argparse::ArgumentParser& program, int argc,
+                    const char* const argv[])
 {
-    static const std::string version = std::to_string(version_major) + "." +
-                                       std::to_string(version_minor) + "." +
-                                       std::to_string(version_patch);
-    return version;
-}
-
-int main(int argc, char* argv[])
-{
-#ifndef NDEBUG
-    spdlog::set_level(spdlog::level::debug);
-#endif  // NDEBUG
-
-    static const auto version = get_version();
-    argparse::ArgumentParser program(program_name, version);
-
     program.add_argument("--config", "-c")
         .required()
         .help("specify the configuration file path");
@@ -32,14 +21,56 @@ int main(int argc, char* argv[])
     try {
         program.parse_args(argc, argv);
     } catch (const std::runtime_error& err) {
-        std::cerr << err.what() << std::endl;
-        std::cerr << program;
+        fmt::print(stderr, "{}\n{}", err.what(), program.help().str());
+        std::exit(1);
+    }
+}
+
+AppConfig extract_arguments(argparse::ArgumentParser& program)
+{
+    auto config_path = program.get("-c");
+    spdlog::debug("configuration path is {}", config_path);
+
+    AppConfig config;
+    try {
+        auto parsed_config = toml::parse_file(config_path);
+        config = load_config(std::move(parsed_config));
+    } catch (const std::runtime_error& err) {
+        fmt::print(stderr, "configuration invalid, reason: {}", err.what());
         std::exit(1);
     }
 
-    spdlog::debug("current version is {}", version);
+    return config;
+}
 
-    auto config_path = program.get("-c");
-    auto config = toml::parse_file(config_path);
-    spdlog::debug("configuration path is {}", config_path);
+void run_app(AppConfig& config)
+{
+    std::mutex com_status_mutex;
+    std::vector<SerialPortInfo> com_status;
+
+    concurrencpp::runtime runtime;
+
+    concurrencpp::timer com_query_timer = runtime.timer_queue()->make_timer(
+        1s, 1s, runtime.thread_executor(), [&] {
+            auto status = query_system_com_port();
+            const std::lock_guard<std::mutex> lock(com_status_mutex);
+            com_status.swap(status);
+        });
+}
+
+int main(int argc, char* argv[])
+{
+#ifndef NDEBUG
+    spdlog::set_level(spdlog::level::debug);
+#endif  // NDEBUG
+    spdlog::debug("current version is {}", version.to_string());
+
+    argparse::ArgumentParser program(std::string{program_name},
+                                     version.to_string());
+
+    make_arguments(program, argc, argv);
+
+    auto config = extract_arguments(program);
+
+    run_app(config);
 }
