@@ -4,12 +4,12 @@
 
 ### 1. 环境配置
 
-安装：[GCC](https://gcc-mcf.lhmouse.com/)，[XMake](https://xmake.io/)
+安装：[MSVC](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022)，[XMake](https://xmake.io/)
 
 ### 2. 初始化编译环境
 
 ```shell
-xmake f -p mingw -a x86_64 -y
+xmake f -p windows -a x64 -y
 ```
 
 ### 3. 启动编译
@@ -18,7 +18,7 @@ xmake f -p mingw -a x86_64 -y
 xmake -y
 ```
 
-编译产物在 `mingw\x86_64`中
+编译产物在 `windows\x64`中
 
 ### 4. 运行测试
 
