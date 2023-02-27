@@ -79,7 +79,7 @@ Redis 的版本: Redis-x64-5.0.14.1
 | `handlerName` || `TOPIC_WRENCH_TASK_UP_SEND` =扳手数据上行字符标识|
 | `currentTime` ||当前时间|
 | `msgTxt` ||消息内容的业务数据|
-| `stationIp` ||工位IP|
+|· `stationIp` | `msgTxt` |工位IP|
 |· `taskId` | `msgTxt` |任务ID|
 |· `taskDetailId` | `msgTxt` |子任务ID|
 |· `taskDesc` | `msgTxt` |任务的描述|
