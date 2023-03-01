@@ -9,18 +9,21 @@ size_t decode(uint8_t *&out, const uint8_t *const in, size_t in_len)
         return 0;
     }
 
+    // 因为解码的数据种类多样，暂时注释寻找解码部分
+    size_t start = 0, end = in_len - 1;
+
     // 找到需要解码的部分
-    size_t start, end;
-    for (start = 0; start < in_len; start++) {
-        if (in[start] == 0) {
-            break;
-        }
-    }
-    for (end = start; end < in_len; end++) {
-        if (in[end] == 2) {
-            break;
-        }
-    }
+    // size_t start, end;
+    // for (start = 0; start < in_len; start++) {
+    //     if (in[start] == 0) {
+    //         break;
+    //     }
+    // }
+    // for (end = start; end < in_len; end++) {
+    //     if (in[end] == 2) {
+    //         break;
+    //     }
+    // }
 
     // 没有找到控制单元
     if (start >= in_len || end >= in_len || end <= start) {
