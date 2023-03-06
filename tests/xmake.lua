@@ -1,8 +1,0 @@
-target("all_test", function ()
-    add_packages("hiredis", "gtest", "toml++", "redis-plus-plus")
-    add_deps("wrench_lib")
-    set_kind("binary")
-    add_includedirs("$(projectdir)/includes")
-    add_files("**.cpp")
-    set_rundir("$(projectdir)/tests")
-end)
