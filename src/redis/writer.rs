@@ -14,6 +14,7 @@ pub fn write_redis(
 ) -> anyhow::Result<()> {
     let client = redis::Client::open(config.database.uri.clone())?;
     let mut con = client.get_connection()?;
+
     debug!(
         "Redis writer listening on {}/{}",
         config.database.uri, config.database.queue
@@ -21,17 +22,15 @@ pub fn write_redis(
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(msg) = rx.try_recv() {
             if let Action::ConnectStatus((status, info)) = msg {
+                debug!("serial: {} connect status: {}", info.wrench_serial, status);
                 let connect_response = ConnectResponse {
                     msg_type: "0".to_string(),
                     msg_id: info.msg_id,
                     handler_name: "TOPIC_WRENCH_CONNECTION_ASK".to_string(),
                     msg_txt: ConnectResponseMsg {
-                        wrench_name: None,
                         wrench_serial: Some(format!("{:X}", info.wrench_serial)),
                         status: Some(if status { "0" } else { "1" }.to_string()),
-                        desc: None,
-                        current_time: None,
-                        task_id: None,
+                        ..Default::default()
                     },
                 };
                 con.publish(
@@ -39,6 +38,9 @@ pub fn write_redis(
                     serde_json::to_string(&connect_response)?,
                 )?;
             }
+        } else {
+            debug!("No message");
+            std::thread::yield_now();
         }
     }
 

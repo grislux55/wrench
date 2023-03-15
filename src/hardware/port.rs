@@ -160,15 +160,15 @@ fn com_process<'a>(
         }
 
         if let Ok(Action::CheckConnect(target)) = rx.try_recv() {
+            let mut connected = false;
             if let Some(mac) = serial_to_mac.get(&target.wrench_serial) {
                 if let Some(last_heart_beat) = last_heart_beat.get(&mac) {
                     if last_heart_beat.elapsed() < Duration::from_secs(30) {
-                        tx.send(Action::ConnectStatus((true, target)))?;
-                        continue;
+                        connected = true;
                     }
                 }
             }
-            tx.send(Action::ConnectStatus((false, target)))?;
+            tx.send(Action::ConnectStatus((connected, target)))?;
         }
     }
 

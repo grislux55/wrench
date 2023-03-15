@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectResquestMsg {
     pub station_ip: Option<String>,
@@ -9,7 +9,7 @@ pub struct ConnectResquestMsg {
     pub wrench_serial: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectResqust {
     pub msg_id: String,
@@ -19,7 +19,7 @@ pub struct ConnectResqust {
     pub msg_txt: ConnectResquestMsg,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectResponseMsg {
     pub wrench_name: Option<String>,
@@ -30,7 +30,7 @@ pub struct ConnectResponseMsg {
     pub task_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectResponse {
     pub msg_type: String,
@@ -39,7 +39,7 @@ pub struct ConnectResponse {
     pub msg_txt: ConnectResponseMsg,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRequestMsg {
     pub station_ip: Option<String>,
@@ -66,7 +66,7 @@ pub struct TaskRequestMsg {
     pub unit: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRequest {
     pub msg_id: String,
@@ -76,7 +76,7 @@ pub struct TaskRequest {
     pub msg_txt: TaskRequestMsg,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponseMsg {
     pub wrench_serial: Option<String>,
@@ -85,7 +85,7 @@ pub struct TaskResponseMsg {
     pub desc: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
     pub msg_id: String,
@@ -94,7 +94,7 @@ pub struct TaskResponse {
     pub msg_txt: TaskResponseMsg,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatusMsg {
     pub msg_id: Option<String>,
@@ -112,7 +112,7 @@ pub struct TaskStatusMsg {
     pub current_time: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatus {
     pub msg_id: String,

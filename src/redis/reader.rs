@@ -56,6 +56,8 @@ pub fn read_redis(
                 }
                 _ => {}
             }
+        } else {
+            std::thread::yield_now();
         }
     }
 
