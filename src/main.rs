@@ -1,20 +1,22 @@
 mod app_data;
 mod hardware;
+mod message;
 mod redis;
 
 use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        mpsc, Arc, Mutex,
     },
 };
 
 use app_data::Cli;
+use bus::Bus;
 use clap::Parser;
 use tracing::{debug, error, Level};
 
-use crate::app_data::AppConfig;
+use crate::{app_data::AppConfig, message::Action};
 
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -40,26 +42,65 @@ fn run() -> anyhow::Result<()> {
         })?;
     }
 
+    let (redis_reader_tx, redis_reader_rx) = mpsc::channel();
+    let (redis_writer_tx, redis_writer_rx) = mpsc::channel();
+    let (port_handler_tx, port_handler_rx) = mpsc::channel();
+    let bus = Arc::new(Mutex::new(Bus::new(100)));
+
     let redis_reader = {
         let exit_required = exit_required.clone();
+        let config = config.clone();
         std::thread::spawn(move || {
-            if let Err(e) = redis::reader::read_redis(exit_required, &config) {
+            if let Err(e) = redis::reader::read_redis(exit_required, &config, redis_reader_tx) {
+                error!("Error: {}", e);
+            }
+        })
+    };
+    let redis_writer = {
+        let exit_required = exit_required.clone();
+        let config = config.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = redis::writer::write_redis(exit_required, &config, redis_writer_rx) {
                 error!("Error: {}", e);
             }
         })
     };
     let port_handler = {
         let exit_required = exit_required.clone();
+        let bus = bus.clone();
         std::thread::spawn(move || {
-            if let Err(e) = hardware::port::loop_query(exit_required) {
+            if let Err(e) = hardware::port::loop_query(exit_required, port_handler_tx, bus) {
                 error!("Error: {}", e);
             }
         })
     };
 
+    while !exit_required.load(Ordering::Acquire) {
+        if let Ok(act) = redis_reader_rx.try_recv() {
+            match act {
+                Action::CheckConnect(info) => {
+                    if let Ok(mut lock) = bus.lock() {
+                        lock.broadcast(Action::CheckConnect(info));
+                    }
+                }
+                Action::ConnectStatus(_) => todo!(),
+            }
+        }
+        if let Ok(msg) = port_handler_rx.try_recv() {
+            debug!("Port reader: {:?}", msg);
+            if let Action::ConnectStatus(act) = msg {
+                redis_writer_tx.send(Action::ConnectStatus(act)).unwrap();
+            }
+        }
+    }
+
     redis_reader
         .join()
         .map_err(|_| anyhow::anyhow!("Unexpected Redis reader exiting"))?;
+
+    redis_writer
+        .join()
+        .map_err(|_| anyhow::anyhow!("Unexpected Redis writer exiting"))?;
 
     port_handler
         .join()

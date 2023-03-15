@@ -10,12 +10,12 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     pub database: DataBase,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DataBase {
     pub queue: String,
     pub uri: String,

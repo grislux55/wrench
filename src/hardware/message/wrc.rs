@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCJointDataMode {
     Torque = 0,
@@ -6,6 +7,7 @@ pub enum WRCJointDataMode {
     AngleTorque,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCJointDataMethod {
     Click = 0,
@@ -13,6 +15,7 @@ pub enum WRCJointDataMethod {
     Track,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCJointDataUnit {
     Nm = 0,
@@ -20,12 +23,14 @@ pub enum WRCJointDataUnit {
     Ftlb,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCPacketDirection {
     FromClient = 0,
     FromServer = 1,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCPacketType {
     Unknown = 0,
@@ -46,6 +51,7 @@ pub enum WRCPacketType {
     InlineJointData,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCStatus {
     None = 0,
