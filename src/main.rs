@@ -14,9 +14,10 @@ use std::{
 use app_data::Cli;
 use bus::Bus;
 use clap::Parser;
+
 use tracing::{debug, error, Level};
 
-use crate::{app_data::AppConfig, message::Action};
+use crate::app_data::AppConfig;
 
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -58,7 +59,6 @@ fn run() -> anyhow::Result<()> {
     };
     let redis_writer = {
         let exit_required = exit_required.clone();
-        let config = config.clone();
         std::thread::spawn(move || {
             if let Err(e) = redis::writer::write_redis(exit_required, &config, redis_writer_rx) {
                 error!("Error: {}", e);
@@ -77,20 +77,13 @@ fn run() -> anyhow::Result<()> {
 
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(act) = redis_reader_rx.try_recv() {
-            match act {
-                Action::CheckConnect(info) => {
-                    if let Ok(mut lock) = bus.lock() {
-                        lock.broadcast(Action::CheckConnect(info));
-                    }
-                }
-                Action::ConnectStatus(_) => todo!(),
+            if let Ok(mut lock) = bus.lock() {
+                lock.broadcast(act);
             }
         }
         if let Ok(msg) = port_handler_rx.try_recv() {
             debug!("Port reader: {:?}", msg);
-            if let Action::ConnectStatus(act) = msg {
-                redis_writer_tx.send(Action::ConnectStatus(act)).unwrap();
-            }
+            redis_writer_tx.send(msg)?;
         }
     }
 
@@ -113,11 +106,13 @@ fn main() {
     if cfg!(debug_assertions) {
         tracing_subscriber::fmt()
             .without_time()
+            .with_ansi(false)
             .with_max_level(Level::DEBUG)
             .init();
     } else {
         tracing_subscriber::fmt()
             .without_time()
+            .with_ansi(false)
             .with_max_level(Level::INFO)
             .init();
     }

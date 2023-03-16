@@ -2,7 +2,41 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct ConnectResquestMsg {
+pub struct BindRequestMsg {
+    pub station_ip: Option<String>,
+    pub product_serial_no: Option<String>,
+    pub current_time: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BindRequest {
+    pub msg_id: String,
+    pub msg_type: String,
+    pub handler_name: String,
+    pub msg_txt: BindRequestMsg,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BindResponseMsg {
+    pub product_serial_no: Option<String>,
+    pub serial_no: Option<String>,
+    pub current_time: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BindResponse {
+    pub msg_id: String,
+    pub msg_type: String,
+    pub handler_name: String,
+    pub msg_txt: BindResponseMsg,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectRequestMsg {
     pub station_ip: Option<String>,
     pub task_id: Option<String>,
     pub wrench_name: Option<String>,
@@ -11,12 +45,12 @@ pub struct ConnectResquestMsg {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct ConnectResqust {
+pub struct ConnectRequest {
     pub msg_id: String,
     pub msg_type: String,
     pub handler_name: String,
     pub current_time: String,
-    pub msg_txt: ConnectResquestMsg,
+    pub msg_txt: ConnectRequestMsg,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
