@@ -4,6 +4,7 @@ use anyhow::bail;
 use bitvec::prelude::*;
 
 pub const SM_7_BIT_END_BYTE: u8 = 0x80;
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum SM7BitControlBits {
     USBLocal = 0x02,
