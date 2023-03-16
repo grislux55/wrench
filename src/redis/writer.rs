@@ -64,6 +64,7 @@ pub fn write_redis(
                             current_time: Some(
                                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                             ),
+                            task_id: Some(info.task_id),
                             ..Default::default()
                         },
                     };

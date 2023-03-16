@@ -3,6 +3,7 @@ pub struct ConnectInfo {
     pub msg_id: String,
     pub wrench_serial: u128,
     pub status: bool,
+    pub task_id: String,
 }
 
 #[derive(Debug, Clone, Default)]
