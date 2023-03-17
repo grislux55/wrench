@@ -71,6 +71,7 @@ pub fn read_redis(
                                 tx.send(RequiredAction::CheckConnect(ConnectInfo {
                                     msg_id: connect_request.msg_id,
                                     wrench_serial: s,
+                                    task_id: connect_request.msg_txt.task_id.unwrap_or_default(),
                                     ..Default::default()
                                 }))?;
                             }

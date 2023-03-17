@@ -4,6 +4,7 @@ pub struct ConnectInfo {
     pub wrench_serial: u128,
     pub status: bool,
     pub task_id: String,
+    pub wrench_name: String,
 }
 
 #[derive(Debug, Clone, Default)]

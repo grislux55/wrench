@@ -65,7 +65,15 @@ pub fn write_redis(
                                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                             ),
                             task_id: Some(info.task_id),
-                            ..Default::default()
+                            desc: Some(
+                                if info.status {
+                                    "连接成功"
+                                } else {
+                                    "连接失败"
+                                }
+                                .to_string(),
+                            ),
+                            wrench_name: Some(info.wrench_name),
                         },
                     };
                     con.publish(

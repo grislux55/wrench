@@ -191,6 +191,12 @@ fn com_process<'a>(
                 }
                 let mac = serial_to_mac[&target.wrench_serial];
 
+                if !serial_to_name.contains_key(&target.wrench_serial) {
+                    tx.send(ResponseAction::ConnectStatus(target))?;
+                    continue;
+                }
+                target.wrench_name = serial_to_name[&target.wrench_serial].clone();
+
                 if !last_heart_beat.contains_key(&mac) {
                     tx.send(ResponseAction::ConnectStatus(target))?;
                     continue;
