@@ -29,19 +29,13 @@ pub fn write_redis(
                         info.wrench_serial, info.connect_id
                     );
                     let bind_response = BindResponse {
-                        msg_type: "1".to_string(),
                         msg_id: Uuid::new_v4().simple().to_string(),
                         handler_name: "TOPIC_WRENCH_SERIAL_INIT_RECEIVE".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         msg_txt: BindResponseMsg {
-                            product_serial_no: Some(info.connect_id),
-                            serial_no: if info.wrench_serial != 0 {
-                                Some(format!("{:X}", info.wrench_serial))
-                            } else {
-                                None
-                            },
-                            current_time: Some(
-                                chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                            ),
+                            product_serial_no: info.connect_id,
+                            serial_no: format!("{:X}", info.wrench_serial),
+                            msg_id: info.msg_id,
                         },
                     };
                     con.publish(
@@ -55,25 +49,19 @@ pub fn write_redis(
                         info.wrench_serial, info.status
                     );
                     let connect_response = ConnectResponse {
-                        msg_type: "0".to_string(),
                         msg_id: Uuid::new_v4().simple().to_string(),
                         handler_name: "TOPIC_WRENCH_CONNECTION_ASK".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         msg_txt: ConnectResponseMsg {
-                            wrench_serial: Some(format!("{:X}", info.wrench_serial)),
-                            status: Some(if info.status { "0" } else { "1" }.to_string()),
-                            current_time: Some(
-                                chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                            ),
-                            task_id: Some(info.task_id),
-                            desc: Some(
-                                if info.status {
-                                    "连接成功"
-                                } else {
-                                    "连接失败"
-                                }
-                                .to_string(),
-                            ),
-                            wrench_name: Some(info.wrench_name),
+                            wrench_serial: format!("{:X}", info.wrench_serial),
+                            status: if info.status { "0" } else { "1" }.to_string(),
+                            desc: if info.status {
+                                "连接成功"
+                            } else {
+                                "连接失败"
+                            }
+                            .to_string(),
+                            msg_id: info.msg_id,
                         },
                     };
                     con.publish(

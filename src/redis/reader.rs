@@ -52,7 +52,8 @@ pub fn read_redis(
                     };
                     debug!("bind request: {:?}", bind_request);
                     tx.send(RequiredAction::BindWrench(WrenchInfo {
-                        connect_id: bind_request.msg_txt.product_serial_no.unwrap_or_default(),
+                        msg_id: bind_request.msg_id,
+                        connect_id: bind_request.msg_txt.product_serial_no,
                         ..Default::default()
                     }))?;
                 }
@@ -65,18 +66,15 @@ pub fn read_redis(
                         }
                     };
                     debug!("connect request: {:?}", connect_request);
-                    if let Some(serial) = connect_request.msg_txt.wrench_serial {
-                        match u128::from_str_radix(&serial, 16) {
-                            Ok(s) => {
-                                tx.send(RequiredAction::CheckConnect(ConnectInfo {
-                                    msg_id: connect_request.msg_id,
-                                    wrench_serial: s,
-                                    task_id: connect_request.msg_txt.task_id.unwrap_or_default(),
-                                    ..Default::default()
-                                }))?;
-                            }
-                            Err(_) => error!("invalid serial number"),
+                    match u128::from_str_radix(&connect_request.msg_txt.wrench_serial, 16) {
+                        Ok(s) => {
+                            tx.send(RequiredAction::CheckConnect(ConnectInfo {
+                                msg_id: connect_request.msg_id,
+                                wrench_serial: s,
+                                ..Default::default()
+                            }))?;
                         }
+                        Err(_) => error!("invalid serial number"),
                     }
                 }
                 Some(Value::String(s)) if s == "TOPIC_WRENCH_TASK_UP_SEND" => {
