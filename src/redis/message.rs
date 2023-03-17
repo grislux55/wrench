@@ -98,27 +98,26 @@ pub struct TaskRequestMsg {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRequest {
     pub msg_id: String,
-    pub msg_type: String,
     pub handler_name: String,
     pub current_time: String,
-    pub msg_txt: TaskRequestMsg,
+    pub msg_txt: Vec<TaskRequestMsg>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponseMsg {
-    pub wrench_serial: Option<String>,
-    pub current_time: Option<String>,
-    pub status: Option<String>,
-    pub desc: Option<String>,
+    pub wrench_serial: String,
+    pub status: String,
+    pub desc: String,
+    pub msg_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
     pub msg_id: String,
-    pub msg_type: String,
     pub handler_name: String,
+    pub current_time: String,
     pub msg_txt: TaskResponseMsg,
 }
 
