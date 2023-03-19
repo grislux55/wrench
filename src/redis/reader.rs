@@ -18,7 +18,7 @@ fn main_loop(
     config: &AppConfig,
     exit_required: Arc<AtomicBool>,
     mut con: redis::Connection,
-    tx: mpsc::Sender<RequiredAction>,
+    tx: &mpsc::Sender<RequiredAction>,
 ) -> anyhow::Result<()> {
     let mut pubsub = con.as_pubsub();
     pubsub.subscribe(&config.database.queue)?;
@@ -113,7 +113,7 @@ pub fn read_redis(
     while !exit_required.load(Ordering::Acquire) {
         match get_pubsub(config) {
             Ok(con) => {
-                if let Err(e) = main_loop(config, exit_required.clone(), con, tx.clone()) {
+                if let Err(e) = main_loop(config, exit_required.clone(), con, &tx) {
                     error!("redis reader error: {}", e);
                 }
             }
