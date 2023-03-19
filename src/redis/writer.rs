@@ -87,8 +87,8 @@ pub fn write_redis(
     exit_required: Arc<AtomicBool>,
     config: &AppConfig,
     rx: mpsc::Receiver<ResponseAction>,
-) -> anyhow::Result<()> {
-    while exit_required.load(Ordering::Acquire) {
+) {
+    while !exit_required.load(Ordering::Acquire) {
         match get_con(config) {
             Ok(con) => {
                 if let Err(e) = main_loop(config, con, exit_required.clone(), &rx) {
@@ -97,11 +97,8 @@ pub fn write_redis(
             }
             Err(e) => {
                 error!("redis connection error: {}", e);
+                std::thread::yield_now();
             }
         }
-
-        std::thread::yield_now();
     }
-
-    Ok(())
 }

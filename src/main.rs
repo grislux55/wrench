@@ -52,27 +52,19 @@ fn run() -> anyhow::Result<()> {
         let exit_required = exit_required.clone();
         let config = config.clone();
         std::thread::spawn(move || {
-            if let Err(e) = redis::reader::read_redis(exit_required, &config, redis_reader_tx) {
-                error!("Error: {}", e);
-            }
+            redis::reader::read_redis(exit_required, &config, redis_reader_tx)
         })
     };
     let redis_writer = {
         let exit_required = exit_required.clone();
         std::thread::spawn(move || {
-            if let Err(e) = redis::writer::write_redis(exit_required, &config, redis_writer_rx) {
-                error!("Error: {}", e);
-            }
+            redis::writer::write_redis(exit_required, &config, redis_writer_rx)
         })
     };
     let port_handler = {
         let exit_required = exit_required.clone();
         let bus = bus.clone();
-        std::thread::spawn(move || {
-            if let Err(e) = hardware::port::loop_query(exit_required, port_handler_tx, bus) {
-                error!("Error: {}", e);
-            }
-        })
+        std::thread::spawn(move || hardware::port::loop_query(exit_required, port_handler_tx, bus))
     };
 
     while !exit_required.load(Ordering::Acquire) {
