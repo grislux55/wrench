@@ -8,14 +8,12 @@ use crate::AppConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 
-pub fn write_redis(
-    exit_required: Arc<AtomicBool>,
+fn main_loop(
     config: &AppConfig,
-    rx: mpsc::Receiver<ResponseAction>,
+    mut con: redis::Connection,
+    exit_required: Arc<AtomicBool>,
+    rx: &mpsc::Receiver<ResponseAction>,
 ) -> anyhow::Result<()> {
-    let client = redis::Client::open(config.database.uri.clone())?;
-    let mut con = client.get_connection()?;
-
     debug!(
         "Redis writer listening on {}/{}",
         config.database.uri, config.database.queue
@@ -69,6 +67,31 @@ pub fn write_redis(
                         serde_json::to_string(&connect_response)?,
                     )?;
                 }
+            }
+        } else {
+            std::thread::yield_now();
+        }
+    }
+
+    Ok(())
+}
+
+fn get_con(config: &AppConfig) -> anyhow::Result<redis::Connection> {
+    let client = redis::Client::open(config.database.uri.clone())?;
+    let con = client.get_connection()?;
+
+    Ok(con)
+}
+
+pub fn write_redis(
+    exit_required: Arc<AtomicBool>,
+    config: &AppConfig,
+    rx: mpsc::Receiver<ResponseAction>,
+) -> anyhow::Result<()> {
+    while exit_required.load(Ordering::Acquire) {
+        if let Ok(con) = get_con(config) {
+            if let Err(e) = main_loop(config, con, exit_required.clone(), &rx) {
+                debug!("Redis writer error: {}", e);
             }
         } else {
             std::thread::yield_now();
