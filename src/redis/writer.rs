@@ -1,5 +1,5 @@
 use redis::Commands;
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::message::ResponseAction;
@@ -89,13 +89,18 @@ pub fn write_redis(
     rx: mpsc::Receiver<ResponseAction>,
 ) -> anyhow::Result<()> {
     while exit_required.load(Ordering::Acquire) {
-        if let Ok(con) = get_con(config) {
-            if let Err(e) = main_loop(config, con, exit_required.clone(), &rx) {
-                debug!("Redis writer error: {}", e);
+        match get_con(config) {
+            Ok(con) => {
+                if let Err(e) = main_loop(config, con, exit_required.clone(), &rx) {
+                    error!("redis writer error: {}", e);
+                }
             }
-        } else {
-            std::thread::yield_now();
+            Err(e) => {
+                error!("redis connection error: {}", e);
+            }
         }
+
+        std::thread::yield_now();
     }
 
     Ok(())
