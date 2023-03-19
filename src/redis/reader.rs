@@ -14,13 +14,12 @@ use crate::{
 };
 use std::sync::Arc;
 
-pub fn read_redis(
-    exit_required: Arc<AtomicBool>,
+fn main_loop(
     config: &AppConfig,
+    exit_required: Arc<AtomicBool>,
+    mut con: redis::Connection,
     tx: mpsc::Sender<RequiredAction>,
 ) -> anyhow::Result<()> {
-    let client = redis::Client::open(config.database.uri.clone())?;
-    let mut con = client.get_connection()?;
     let mut pubsub = con.as_pubsub();
     pubsub.subscribe(&config.database.queue)?;
     pubsub.set_read_timeout(Some(std::time::Duration::from_secs(1)))?;
@@ -94,6 +93,35 @@ pub fn read_redis(
         } else {
             std::thread::yield_now();
         }
+    }
+
+    Ok(())
+}
+
+fn get_pubsub(config: &AppConfig) -> anyhow::Result<redis::Connection> {
+    let client = redis::Client::open(config.database.uri.clone())?;
+    let con = client.get_connection()?;
+
+    Ok(con)
+}
+
+pub fn read_redis(
+    exit_required: Arc<AtomicBool>,
+    config: &AppConfig,
+    tx: mpsc::Sender<RequiredAction>,
+) -> anyhow::Result<()> {
+    while !exit_required.load(Ordering::Acquire) {
+        match get_pubsub(config) {
+            Ok(con) => {
+                if let Err(e) = main_loop(config, exit_required.clone(), con, tx.clone()) {
+                    error!("redis reader error: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("redis connection error: {}", e);
+            }
+        }
+        std::thread::yield_now();
     }
 
     Ok(())
