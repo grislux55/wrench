@@ -70,6 +70,7 @@ fn run() -> anyhow::Result<()> {
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(act) = redis_reader_rx.try_recv() {
             if let Ok(mut lock) = bus.lock() {
+                debug!("Send message {:?} to port handler", act);
                 lock.broadcast(act);
             }
         }

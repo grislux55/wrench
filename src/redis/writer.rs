@@ -3,7 +3,10 @@ use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::message::ResponseAction;
-use crate::redis::message::{BindResponse, BindResponseMsg, ConnectResponse, ConnectResponseMsg};
+use crate::redis::message::{
+    BindResponse, BindResponseMsg, ConnectResponse, ConnectResponseMsg, TaskResponse,
+    TaskResponseMsg,
+};
 use crate::AppConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
@@ -21,7 +24,7 @@ fn main_loop(
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(msg) = rx.try_recv() {
             match msg {
-                ResponseAction::BindStatus(info) => {
+                ResponseAction::BindResponse(info) => {
                     debug!(
                         "bind serial: {:X} to {}",
                         info.wrench_serial, info.connect_id
@@ -65,6 +68,29 @@ fn main_loop(
                     con.publish(
                         config.database.queue.as_str(),
                         serde_json::to_string(&connect_response)?,
+                    )?;
+                }
+                ResponseAction::TaskStatus(info) => {
+                    debug!("msg id: {} status: {}", info.msg_id, info.status);
+                    let task_response = TaskResponse {
+                        msg_id: Uuid::new_v4().simple().to_string(),
+                        handler_name: "TOPIC_WRENCH_TASK_UP_ASK".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        msg_txt: TaskResponseMsg {
+                            wrench_serial: format!("{:X}", info.wrench_serial),
+                            status: if info.status { "0" } else { "1" }.to_string(),
+                            desc: if info.status {
+                                "接受成功"
+                            } else {
+                                "接受失败"
+                            }
+                            .to_string(),
+                            msg_id: info.msg_id,
+                        },
+                    };
+                    con.publish(
+                        config.database.queue.as_str(),
+                        serde_json::to_string(&task_response)?,
                     )?;
                 }
             }

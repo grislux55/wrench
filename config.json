@@ -1,6 +1,6 @@
 {
   "database": {
     "queue": "jeecg_redis_topic",
-    "uri": "redis://default:redispw@localhost:32771"
+    "uri": "redis://default:redispw@localhost:32768"
   }
 }

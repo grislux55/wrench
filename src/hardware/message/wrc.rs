@@ -143,7 +143,7 @@ pub struct WRCPayloadInlineJointData {
 }
 
 bitfield::bitfield! {
-    pub struct WRCPayloadJointDataFlag(u8);
+    pub struct WRCPayloadSetJointFlag(u8);
     impl Debug;
     u8;
     pub get_rsvd, set_rsvd: 1, 0;
@@ -165,7 +165,7 @@ pub struct WRCPayloadSetJoint {
     pub fda: i16,
     pub task_repeat_times: u16,
     pub task_id: u16,
-    pub flag: WRCPayloadJointDataFlag,
+    pub flag: WRCPayloadSetJointFlag,
 }
 
 #[derive(Debug)]
@@ -378,7 +378,7 @@ impl TryFrom<Vec<u8>> for WRCPacket {
                 let mut task_id = [0u8; 2];
                 task_id.copy_from_slice(&payload[30..32]);
                 let task_id = u16::from_le_bytes(task_id);
-                let flag = WRCPayloadJointDataFlag(payload[32]);
+                let flag = WRCPayloadSetJointFlag(payload[32]);
                 WRCPayload::SetJoint(WRCPayloadSetJoint {
                     torque_setpoint,
                     torque_angle_start,

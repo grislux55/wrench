@@ -67,7 +67,7 @@ pub struct ConnectResponse {
     pub msg_txt: ConnectResponseMsg,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRequestMsg {
     pub station_ip: Option<String>,

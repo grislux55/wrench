@@ -99,7 +99,15 @@ fn main_loop(
                     }
                 };
                 debug!("task request: {:?}", task_request);
+                tx.send(RequiredAction::SendTask((
+                    task_request.msg_id,
+                    task_request.msg_txt,
+                )))?;
             }
+            Some(Value::String(s))
+                if s == "TOPIC_WRENCH_SERIAL_INIT_RECEIVE"
+                    || s == "TOPIC_WRENCH_CONNECTION_ASK"
+                    || s == "TOPIC_WRENCH_TASK_UP_ASK" => {}
             _ => {
                 error!("unknown message type");
             }
