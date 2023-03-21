@@ -31,19 +31,24 @@ fn read_packet(
     let mut serial_buf = [0];
 
     while !exit_required.load(Ordering::Acquire) {
-        if let Ok(readed_size) = port.read(&mut serial_buf) {
-            if readed_size == 0 {
-                continue;
-            }
-            if readed.is_empty()
-                && serial_buf[0] != SM7BitControlBits::USBLocal as u8
-                && serial_buf[0] != SM7BitControlBits::WRC as u8
-            {
-                continue;
-            }
+        match port.read(&mut serial_buf) {
+            Ok(readed_size) => {
+                if readed_size == 0 {
+                    break;
+                }
+                if readed.is_empty()
+                    && serial_buf[0] != SM7BitControlBits::USBLocal as u8
+                    && serial_buf[0] != SM7BitControlBits::WRC as u8
+                {
+                    continue;
+                }
 
-            readed.push(serial_buf[0]);
-            if serial_buf[0] == SM_7_BIT_END_BYTE {
+                readed.push(serial_buf[0]);
+                if serial_buf[0] == SM_7_BIT_END_BYTE {
+                    break;
+                }
+            }
+            Err(_) => {
                 break;
             }
         }
@@ -53,39 +58,31 @@ fn read_packet(
 }
 
 fn reader(exit_required: Arc<AtomicBool>, port: &mut Box<dyn SerialPort>) -> Option<WRCPacket> {
-    while !exit_required.load(Ordering::Acquire) {
-        let readed = read_packet(exit_required.clone(), port);
-        if readed.is_empty() {
-            continue;
-        }
-        // debug!("readed: {readed:02X?}");
+    let readed = read_packet(exit_required, port);
+    if readed.is_empty() {
+        return None;
+    }
+    // debug!("readed: {readed:02X?}");
 
-        let decoded = match sm7bits::decode(&readed) {
-            Ok((SM7BitControlBits::WRC, decoded)) => {
-                match WRCPacket::try_from(decoded) {
-                    Ok(p) => {
-                        // debug!("parsed: {p:?}");
-                        Some(p)
-                    }
-                    Err(e) => {
-                        error!("Cannot parse: {readed:02X?}, reason: {e}");
-                        None
-                    }
+    match sm7bits::decode(&readed) {
+        Ok((SM7BitControlBits::WRC, decoded)) => {
+            match WRCPacket::try_from(decoded) {
+                Ok(p) => {
+                    // debug!("parsed: {p:?}");
+                    Some(p)
+                }
+                Err(e) => {
+                    error!("Cannot parse: {readed:02X?}, reason: {e}");
+                    None
                 }
             }
-            Err(e) => {
-                error!("Cannot decode: {readed:02X?}, reason: {e}");
-                None
-            }
-            _ => None,
-        };
-
-        if decoded.is_some() {
-            return decoded;
         }
+        Err(e) => {
+            error!("Cannot decode: {readed:02X?}, reason: {e}");
+            None
+        }
+        _ => None,
     }
-
-    None
 }
 
 fn query_serial(wrc: &WRCPacket, port: &mut Box<dyn SerialPort>) -> anyhow::Result<()> {
@@ -93,7 +90,7 @@ fn query_serial(wrc: &WRCPacket, port: &mut Box<dyn SerialPort>) -> anyhow::Resu
         sequence_id: 0,
         mac: wrc.mac,
         flag: WRCPacketFlag(25),
-        payload_len: std::mem::size_of::<WRCPayloadGetInfo>() as u8,
+        payload_len: 1u8,
         payload: WRCPayload::GetInfo(WRCPayloadGetInfo {
             flag: WRCPayloadGetInfoFlag(1),
         }),
@@ -110,6 +107,12 @@ fn send_task(
     mac: u32,
     port: &mut Box<dyn SerialPort>,
 ) -> anyhow::Result<()> {
+    let torque = {
+        if task.torque.is_none() {
+            bail!("Torque is not set");
+        }
+        task.torque.as_ref().unwrap().parse::<i32>()?
+    };
     let torque_angle_start = {
         if task.torque_angle_start.is_none() {
             bail!("Torque angle start is not set");
@@ -182,9 +185,9 @@ fn send_task(
         sequence_id,
         mac,
         flag: wrc_flag,
-        payload_len: std::mem::size_of::<WRCPayloadSetJoint>() as u8,
+        payload_len: 33u8,
         payload: WRCPayload::SetJoint(WRCPayloadSetJoint {
-            torque_setpoint: 0,
+            torque_setpoint: torque,
             torque_angle_start,
             torque_upper_tol,
             torque_lower_tol,
@@ -199,9 +202,12 @@ fn send_task(
         }),
     };
     let bytes: Vec<u8> = task_packet.try_into().unwrap();
+    debug!("{:02X?}", bytes);
     port.write_all(&sm7bits::encode(&bytes, SM7BitControlBits::WRC))?;
     Ok(())
 }
+
+type PendingTask = Vec<(TaskInfo, Vec<(bool, TaskRequestMsg)>)>;
 
 pub fn com_process<'a>(
     exit_required: Arc<AtomicBool>,
@@ -221,6 +227,7 @@ pub fn com_process<'a>(
     let mut last_heart_beat: HashMap<u32, Instant> = HashMap::new();
     let mut last_seqid: HashMap<u32, u16> = HashMap::new();
     let mut visited: HashSet<u32> = HashSet::new();
+    let mut mac_to_tasks: HashMap<u32, PendingTask> = HashMap::new();
 
     while !exit_required.load(Ordering::Acquire) {
         let readed = reader(exit_required.clone(), &mut port);
@@ -287,8 +294,47 @@ pub fn com_process<'a>(
                 WRCPayload::JointData => {
                     debug!("unimplemented!(\"JointData\")");
                 }
-                WRCPayload::StatusReport(_) => {
-                    debug!("unimplemented!(\"StatusReport\")");
+                WRCPayload::StatusReport(status_report) => {
+                    debug!("{:?}", status_report);
+                    mac_to_tasks.entry(wrc.mac).and_modify(|v| {
+                        if status_report.status != 0 {
+                            if let Some((task_info, _)) = v.drain(..1).next() {
+                                tx.send(ResponseAction::TaskStatus(task_info)).unwrap();
+                            };
+                        } else {
+                            let mut seqid = match last_seqid.get(&wrc.mac) {
+                                Some(&s) => s,
+                                None => {
+                                    error!("last seqid not found");
+                                    return;
+                                }
+                            };
+                            for (task_info, task_requests) in v.iter_mut() {
+                                for (is_sended, task_request) in task_requests.iter_mut() {
+                                    if !*is_sended {
+                                        if let Err(e) =
+                                            send_task(task_request, seqid + 1, wrc.mac, &mut port)
+                                        {
+                                            error!("send task failed: {}", e);
+                                            tx.send(ResponseAction::TaskStatus(task_info.clone()))
+                                                .unwrap();
+                                            task_info.status = true;
+                                        }
+                                        *is_sended = true;
+                                        seqid += 1;
+                                        break;
+                                    }
+                                }
+                                if seqid == last_seqid[&wrc.mac] {
+                                    task_info.status = true;
+                                    tx.send(ResponseAction::TaskStatus(task_info.clone()))
+                                        .unwrap();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    });
                 }
                 WRCPayload::InlineJointData(_) => {
                     debug!("unimplemented!(\"InlineJointData\")");
@@ -339,19 +385,17 @@ pub fn com_process<'a>(
                 tx.send(ResponseAction::ConnectStatus(target))?;
             }
             Ok(RequiredAction::SendTask((msg_id, target))) => {
-                let mut resp = TaskInfo {
+                let mut task_info = TaskInfo {
                     msg_id,
                     wrench_serial: 0,
                     status: false,
                 };
                 if target.is_empty() {
                     error!("empty task");
-                    tx.send(ResponseAction::TaskStatus(resp))?;
                     continue;
                 }
                 if target[0].wrench_serial.is_none() {
                     error!("serial number should not be None");
-                    tx.send(ResponseAction::TaskStatus(resp))?;
                     continue;
                 }
                 let wrench_serial =
@@ -359,41 +403,59 @@ pub fn com_process<'a>(
                         Ok(s) => s,
                         Err(_) => {
                             error!("invalid serial number");
-                            tx.send(ResponseAction::TaskStatus(resp))?;
                             continue;
                         }
                     };
-                resp.wrench_serial = wrench_serial;
+                task_info.wrench_serial = wrench_serial;
                 let mac = match serial_to_mac.get(&wrench_serial) {
                     Some(&m) => m,
                     None => {
                         error!("unknown serial number");
-                        tx.send(ResponseAction::TaskStatus(resp))?;
                         continue;
                     }
                 };
-                let mut seqid = match last_seqid.get(&mac) {
-                    Some(&s) => s,
-                    None => {
-                        error!("last seqid not found");
-                        tx.send(ResponseAction::TaskStatus(resp))?;
-                        continue;
-                    }
-                };
-                for task in target.iter() {
-                    if let Err(e) = send_task(task, seqid + 1, mac, &mut port) {
-                        error!("send task failed: {}", e);
-                        tx.send(ResponseAction::TaskStatus(resp.clone()))?;
-                        break;
-                    }
-                    seqid += 1;
-                }
-                if (seqid - last_seqid[&mac]) as usize == target.len() {
-                    resp.status = true;
-                    tx.send(ResponseAction::TaskStatus(resp))?;
-                }
+                mac_to_tasks
+                    .entry(mac)
+                    .and_modify(|v| {
+                        v.push((
+                            task_info.clone(),
+                            target.clone().into_iter().map(|t| (false, t)).collect(),
+                        ))
+                    })
+                    .or_insert(vec![(
+                        task_info,
+                        target.into_iter().map(|t| (false, t)).collect(),
+                    )]);
             }
             Err(_) => {}
+        }
+
+        for (mac, task) in mac_to_tasks.iter_mut() {
+            let seqid = match last_seqid.get(mac) {
+                Some(&s) => s,
+                None => {
+                    error!("last seqid not found");
+                    continue;
+                }
+            };
+            for (task_info, task) in task.iter_mut() {
+                if task.iter().all(|(s, _)| *s) {
+                    continue;
+                }
+                if let Some((status, task)) = task.iter_mut().next() {
+                    if *status {
+                        break;
+                    }
+                    if let Err(e) = send_task(task, seqid + 1, *mac, &mut port) {
+                        error!("send task failed: {}", e);
+                        tx.send(ResponseAction::TaskStatus(task_info.clone()))?;
+                        task_info.status = true;
+                    }
+                    *status = true;
+                }
+                break;
+            }
+            task.retain(|t| !t.0.status);
         }
     }
 
