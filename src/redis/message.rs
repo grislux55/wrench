@@ -20,7 +20,7 @@ pub struct BindRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BindResponseMsg {
     pub product_serial_no: String,
-    pub serial_no: String,
+    pub wrench_serial: String,
     pub msg_id: String,
 }
 

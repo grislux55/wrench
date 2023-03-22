@@ -31,11 +31,11 @@ fn main_loop(
                     );
                     let bind_response = BindResponse {
                         msg_id: Uuid::new_v4().simple().to_string(),
-                        handler_name: "TOPIC_WRENCH_SERIAL_INIT_RECEIVE".to_string(),
+                        handler_name: "TOPIC_WRENCH_SERIAL_INIT_ASK".to_string(),
                         current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         msg_txt: BindResponseMsg {
                             product_serial_no: info.connect_id,
-                            serial_no: format!("{:X}", info.wrench_serial),
+                            wrench_serial: format!("{:X}", info.wrench_serial),
                             msg_id: info.msg_id,
                         },
                     };
