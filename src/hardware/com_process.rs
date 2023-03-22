@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc,
@@ -226,7 +226,6 @@ pub fn com_process<'a>(
     let mut name_to_serial: HashMap<String, u128> = HashMap::new();
     let mut last_heart_beat: HashMap<u32, Instant> = HashMap::new();
     let mut last_seqid: HashMap<u32, u16> = HashMap::new();
-    let mut visited: HashSet<u32> = HashSet::new();
     let mut mac_to_tasks: HashMap<u32, PendingTask> = HashMap::new();
 
     while !exit_required.load(Ordering::Acquire) {
@@ -239,8 +238,7 @@ pub fn com_process<'a>(
                 wrc.mac, last_heart_beat[&wrc.mac]
             );
 
-            if !mac_to_serial.contains_key(&wrc.mac) && !visited.contains(&wrc.mac) {
-                visited.insert(wrc.mac);
+            if !mac_to_serial.contains_key(&wrc.mac) {
                 query_serial(&wrc, &mut port)?;
             }
 
