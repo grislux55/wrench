@@ -45,7 +45,7 @@ fn main_loop(
             }
         };
 
-        debug!("channel '{}': \"{}\"", msg.get_channel_name(), payload);
+        // debug!("channel '{}': \"{}\"", msg.get_channel_name(), payload);
         let parsed: Value = match serde_json::from_str(&payload) {
             Ok(v) => v,
             Err(e) => {
@@ -98,7 +98,7 @@ fn main_loop(
                         continue;
                     }
                 };
-                debug!("task request: {:?}", task_request);
+                // debug!("task request: {:?}", task_request);
                 tx.send(RequiredAction::SendTask((
                     task_request.msg_id,
                     task_request.msg_txt,

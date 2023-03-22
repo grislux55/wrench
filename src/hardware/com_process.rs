@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc,
@@ -9,17 +10,21 @@ use std::{
 
 use anyhow::bail;
 use bus::BusReader;
+use num_bigfloat::BigFloat;
 use serialport::SerialPort;
 use tracing::{debug, error};
 
 use crate::{
     hardware::message::wrc::{WRCPacketFlag, WRCPayload, WRCPayloadGetInfo, WRCPayloadGetInfoFlag},
-    message::{RequiredAction, ResponseAction, TaskInfo, WrenchInfo},
+    message::{ConnectInfo, RequiredAction, ResponseAction, TaskInfo, WrenchInfo},
     redis::message::TaskRequestMsg,
 };
 
 use super::{
-    message::wrc::{WRCPacket, WRCPayloadSetJoint, WRCPayloadSetJointFlag},
+    message::wrc::{
+        WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadSetJoint,
+        WRCPayloadSetJointFlag,
+    },
     sm7bits::{self, SM7BitControlBits, SM_7_BIT_END_BYTE},
 };
 
@@ -101,62 +106,120 @@ fn query_serial(wrc: &WRCPacket, port: &mut Box<dyn SerialPort>) -> anyhow::Resu
     Ok(())
 }
 
+fn clear_task(seqid: u16, mac: u32, port: &mut Box<dyn SerialPort>) -> anyhow::Result<()> {
+    let mut flag = WRCPacketFlag(0);
+    flag.set_direction(true);
+    flag.set_type(10);
+    let clear_packet = WRCPacket {
+        sequence_id: seqid,
+        mac,
+        flag,
+        payload_len: 0u8,
+        payload: WRCPayload::ClearJointData,
+    };
+    let bytes: Vec<u8> = clear_packet.try_into().unwrap();
+    debug!("Sending clear task message by mac: {:X?}", mac);
+    port.write_all(&sm7bits::encode(&bytes, SM7BitControlBits::WRC))?;
+
+    Ok(())
+}
+
 fn send_task(
     task: &TaskRequestMsg,
     sequence_id: u16,
     mac: u32,
     port: &mut Box<dyn SerialPort>,
 ) -> anyhow::Result<()> {
+    debug!("Sending task to mac: {mac:08X}", mac = mac);
     let torque = {
         if task.torque.is_none() {
             bail!("Torque is not set");
         }
-        task.torque.as_ref().unwrap().parse::<i32>()?
+        match BigFloat::from_str(task.torque.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(1000);
+                t.to_i128().unwrap() as i32
+            }
+            Err(e) => bail!("Cannot parse torque: {e}"),
+        }
     };
     let torque_angle_start = {
         if task.torque_angle_start.is_none() {
             bail!("Torque angle start is not set");
         }
-        task.torque_angle_start.as_ref().unwrap().parse::<i32>()?
+        match BigFloat::from_str(task.torque_angle_start.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(1000);
+                t.to_i128().unwrap() as i32
+            }
+            Err(e) => bail!("Cannot parse torque angle start: {e}"),
+        }
     };
     let torque_upper_tol = {
         if task.torque_deviation_up.is_none() {
             bail!("Torque upper tolerance is not set");
         }
-        task.torque_deviation_up.as_ref().unwrap().parse::<i32>()?
+        match BigFloat::from_str(task.torque_deviation_up.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(1000);
+                t.to_i128().unwrap() as i32
+            }
+            Err(e) => bail!("Cannot parse torque upper tolerance: {e}"),
+        }
     };
     let torque_lower_tol = {
         if task.torque_deviation_down.is_none() {
             bail!("Torque lower tolerance is not set");
         }
-        task.torque_deviation_down
-            .as_ref()
-            .unwrap()
-            .parse::<i32>()?
+        match BigFloat::from_str(task.torque_deviation_down.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(1000);
+                t.to_i128().unwrap() as i32
+            }
+            Err(e) => bail!("Cannot parse torque lower tolerance: {e}"),
+        }
     };
     let angle = {
         if task.angle.is_none() {
             bail!("Angle is not set");
         }
-        task.angle.as_ref().unwrap().parse::<i16>()?
+        match BigFloat::from_str(task.angle.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(10);
+                t.to_i128().unwrap() as i16
+            }
+            Err(e) => bail!("Cannot parse angle: {e}"),
+        }
     };
     let angle_upper_tol = {
         if task.angle_deviation_up.is_none() {
             bail!("Angle upper tolerance is not set");
         }
-        task.angle_deviation_up.as_ref().unwrap().parse::<i16>()?
+        match BigFloat::from_str(task.angle_deviation_up.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(10);
+                t.to_i128().unwrap() as i16
+            }
+            Err(e) => bail!("Cannot parse angle upper tolerance: {e}"),
+        }
     };
     let angle_lower_tol = {
         if task.angle_deviation_down.is_none() {
             bail!("Angle lower tolerance is not set");
         }
-        task.angle_deviation_down.as_ref().unwrap().parse::<i16>()?
+        match BigFloat::from_str(task.angle_deviation_down.as_ref().unwrap()) {
+            Ok(mut t) => {
+                t *= BigFloat::from(10);
+                t.to_i128().unwrap() as i16
+            }
+            Err(e) => bail!("Cannot parse angle lower tolerance: {e}"),
+        }
     };
     let task_repeat_times = {
-        if task.repeat_count.is_none() {
-            bail!("Task repeat times is not set");
+        if task.bolt_num.is_none() {
+            bail!("Task bolt num is not set");
         }
-        task.repeat_count.as_ref().unwrap().parse::<u16>()?
+        task.bolt_num.as_ref().unwrap().parse::<u16>()?
     };
     let task_id = {
         if task.task_id.is_none() {
@@ -194,20 +257,157 @@ fn send_task(
             angle,
             angle_upper_tol,
             angle_lower_tol,
-            fdt: 0,
-            fda: 0,
+            fdt: -1,
+            fda: -1,
             task_repeat_times,
             task_id,
             flag: task_flag,
         }),
     };
+    // debug!("{:?}", task_packet);
+
     let bytes: Vec<u8> = task_packet.try_into().unwrap();
-    debug!("{:02X?}", bytes);
+    // debug!("{:02X?}", bytes);
     port.write_all(&sm7bits::encode(&bytes, SM7BitControlBits::WRC))?;
+
     Ok(())
 }
 
-type PendingTask = Vec<(TaskInfo, Vec<(bool, TaskRequestMsg)>)>;
+fn get_joint_data(
+    sequence_id: u16,
+    mac: u32,
+    joint_id_start: u16,
+    joint_count: u8,
+    port: &mut Box<dyn SerialPort>,
+) -> anyhow::Result<()> {
+    let mut wrc_flag = WRCPacketFlag(0);
+    wrc_flag.set_direction(true);
+    wrc_flag.set_type(9);
+    let get_joint_packet = WRCPacket {
+        sequence_id,
+        mac,
+        flag: wrc_flag,
+        payload_len: 3u8,
+        payload: WRCPayload::GetJointData(WRCPayloadGetJointData {
+            joint_id_start,
+            joint_count,
+        }),
+    };
+    // debug!("{:?}", get_joint_packet);
+
+    let bytes: Vec<u8> = get_joint_packet.try_into().unwrap();
+    // debug!("{:02X?}", bytes);
+    port.write_all(&sm7bits::encode(&bytes, SM7BitControlBits::WRC))?;
+
+    Ok(())
+}
+
+fn check_connect(
+    mut target: ConnectInfo,
+    serial_to_mac: &HashMap<u128, u32>,
+    last_heart_beat: &HashMap<u32, Instant>,
+    tx: &mpsc::Sender<ResponseAction>,
+) -> anyhow::Result<()> {
+    target.status = false;
+
+    if !serial_to_mac.contains_key(&target.wrench_serial) {
+        tx.send(ResponseAction::ConnectStatus(target))?;
+        return Ok(());
+    }
+    let mac = serial_to_mac[&target.wrench_serial];
+
+    if !last_heart_beat.contains_key(&mac) {
+        tx.send(ResponseAction::ConnectStatus(target))?;
+        return Ok(());
+    }
+    let last_hb = last_heart_beat[&mac];
+
+    if last_hb.elapsed() < Duration::from_secs(30) {
+        target.status = true;
+    }
+
+    tx.send(ResponseAction::ConnectStatus(target))?;
+
+    Ok(())
+}
+
+pub struct PendingTask {
+    pub finished: bool,
+    pub current: i32,
+    pub tasks: Vec<TaskRequestMsg>,
+}
+
+fn action_send_task(
+    msg_id: String,
+    target: Vec<TaskRequestMsg>,
+    tx: &mpsc::Sender<ResponseAction>,
+    serial_to_mac: &HashMap<u128, u32>,
+    mac_to_tasks: &mut HashMap<u32, PendingTask>,
+    mac_to_seqid_list: &HashMap<u32, Vec<(u16, WRCPacketType)>>,
+    port: &mut Box<dyn SerialPort>,
+) -> anyhow::Result<()> {
+    let mut task_info = TaskInfo {
+        msg_id,
+        wrench_serial: 0,
+        status: false,
+    };
+
+    if target.is_empty() {
+        error!("empty task");
+        tx.send(ResponseAction::TaskStatus(task_info))?;
+        return Ok(());
+    }
+
+    if target[0].wrench_serial.is_none() {
+        error!("serial number should not be None");
+        tx.send(ResponseAction::TaskStatus(task_info))?;
+        return Ok(());
+    }
+
+    let wrench_serial = match u128::from_str_radix(target[0].wrench_serial.as_ref().unwrap(), 16) {
+        Ok(s) => s,
+        Err(_) => {
+            error!("invalid serial number");
+            tx.send(ResponseAction::TaskStatus(task_info))?;
+            return Ok(());
+        }
+    };
+    task_info.wrench_serial = wrench_serial;
+
+    let mac = match serial_to_mac.get(&wrench_serial) {
+        Some(&m) => m,
+        None => {
+            error!("unknown serial number");
+            tx.send(ResponseAction::TaskStatus(task_info))?;
+            return Ok(());
+        }
+    };
+
+    mac_to_tasks
+        .entry(mac)
+        .and_modify(|pending_task| {
+            pending_task.tasks.extend_from_slice(&target);
+        })
+        .or_insert_with(|| {
+            if let Some(&(seqid, _)) = mac_to_seqid_list.get(&mac).and_then(|x| x.last()) {
+                if let Err(e) = clear_task(seqid, mac, port) {
+                    error!("clear task failed: {}", e);
+                }
+            } else {
+                error!("no seqid found, task will not be cleared");
+            }
+            PendingTask {
+                finished: true,
+                current: -1,
+                tasks: target,
+            }
+        });
+
+    task_info.status = true;
+    tx.send(ResponseAction::TaskStatus(task_info))?;
+
+    Ok(())
+}
 
 pub fn com_process<'a>(
     exit_required: Arc<AtomicBool>,
@@ -215,9 +415,23 @@ pub fn com_process<'a>(
     tx: mpsc::Sender<ResponseAction>,
     mut rx: BusReader<RequiredAction>,
 ) -> anyhow::Result<()> {
-    let mut port = serialport::new(port, 115_200)
-        .timeout(Duration::from_millis(1000))
-        .open()?;
+    let mut port = {
+        let port = port.into();
+        loop {
+            if exit_required.load(Ordering::Acquire) {
+                return Ok(());
+            }
+            if let Ok(p) = serialport::new(port.clone(), 115_200)
+                .timeout(Duration::from_millis(1000))
+                .open()
+            {
+                break p;
+            } else {
+                error!("Cannot open port {}, will retry after 1 sec", port);
+                std::thread::sleep(Duration::from_millis(1000));
+            }
+        }
+    };
 
     let mut connection_pending: Vec<WrenchInfo> = vec![];
     let mut mac_to_serial: HashMap<u32, u128> = HashMap::new();
@@ -225,25 +439,22 @@ pub fn com_process<'a>(
     let mut serial_to_name: HashMap<u128, String> = HashMap::new();
     let mut name_to_serial: HashMap<String, u128> = HashMap::new();
     let mut last_heart_beat: HashMap<u32, Instant> = HashMap::new();
-    let mut last_seqid: HashMap<u32, u16> = HashMap::new();
+    let mut mac_to_seqid_list: HashMap<u32, Vec<(u16, WRCPacketType)>> = HashMap::new();
     let mut mac_to_tasks: HashMap<u32, PendingTask> = HashMap::new();
+    let mut last_query_timestamp: Instant = Instant::now();
 
     while !exit_required.load(Ordering::Acquire) {
         let readed = reader(exit_required.clone(), &mut port);
 
         if let Some(wrc) = readed {
             last_heart_beat.insert(wrc.mac, Instant::now());
-            debug!(
-                "Mac: {:X?} LastHeartBeat: {:X?}",
-                wrc.mac, last_heart_beat[&wrc.mac]
-            );
-
-            if !mac_to_serial.contains_key(&wrc.mac) {
-                query_serial(&wrc, &mut port)?;
-            }
+            // debug!(
+            //     "Mac: {:X?} LastHeartBeat: {:X?}",
+            //     wrc.mac, last_heart_beat[&wrc.mac]
+            // );
 
             match wrc.payload {
-                WRCPayload::InfoSerial(info_serial) => {
+                WRCPayload::InfoSerial(ref info_serial) => {
                     debug!(
                         "Mac: {:X?} Serial: {:X?}",
                         wrc.mac,
@@ -252,12 +463,12 @@ pub fn com_process<'a>(
                     mac_to_serial.insert(wrc.mac, u128::from_le_bytes(info_serial.serial));
                     serial_to_mac.insert(u128::from_le_bytes(info_serial.serial), wrc.mac);
                 }
-                WRCPayload::InfoGeneric(info_generic) => {
+                WRCPayload::InfoGeneric(ref info_generic) => {
                     debug!(
                         "Mac: {:X?} LastSeqId: {:X?}",
                         wrc.mac, info_generic.last_server_packet_seqid
                     );
-                    last_seqid.insert(wrc.mac, info_generic.last_server_packet_seqid);
+                    // mac_to_seqid_list.entry(wrc.mac).or_insert(vec![]);
                 }
                 WRCPayload::InfoTiming(_) => {
                     debug!("unimplemented!(\"InfoTiming\")");
@@ -292,50 +503,38 @@ pub fn com_process<'a>(
                 WRCPayload::JointData => {
                     debug!("unimplemented!(\"JointData\")");
                 }
-                WRCPayload::StatusReport(status_report) => {
+                WRCPayload::StatusReport(ref status_report) => {
                     debug!("{:?}", status_report);
-                    mac_to_tasks.entry(wrc.mac).and_modify(|v| {
-                        if status_report.status != 0 {
-                            if let Some((task_info, _)) = v.drain(..1).next() {
-                                tx.send(ResponseAction::TaskStatus(task_info)).unwrap();
-                            };
-                        } else {
-                            let mut seqid = match last_seqid.get(&wrc.mac) {
-                                Some(&s) => s,
-                                None => {
-                                    error!("last seqid not found");
-                                    return;
-                                }
-                            };
-                            for (task_info, task_requests) in v.iter_mut() {
-                                for (is_sended, task_request) in task_requests.iter_mut() {
-                                    if !*is_sended {
-                                        if let Err(e) =
-                                            send_task(task_request, seqid + 1, wrc.mac, &mut port)
-                                        {
-                                            error!("send task failed: {}", e);
-                                            tx.send(ResponseAction::TaskStatus(task_info.clone()))
-                                                .unwrap();
-                                            task_info.status = true;
-                                        }
-                                        *is_sended = true;
-                                        seqid += 1;
-                                        break;
+                }
+                WRCPayload::InlineJointData(ref inline_joint_data) => {
+                    debug!("{:?}", inline_joint_data);
+                    match mac_to_tasks.get_mut(&wrc.mac) {
+                        Some(tasks) => {
+                            if let Some(task) = tasks.tasks.get_mut(tasks.current as usize) {
+                                let ok_num =
+                                    inline_joint_data.iter().filter(|j| j.flag.is_ok()).count();
+                                if let Some(ref bolt_num) = task.bolt_num {
+                                    if Some(ok_num as u16) == bolt_num.parse::<u16>().ok() {
+                                        tasks.finished = true;
                                     }
-                                }
-                                if seqid == last_seqid[&wrc.mac] {
-                                    task_info.status = true;
-                                    tx.send(ResponseAction::TaskStatus(task_info.clone()))
-                                        .unwrap();
-                                } else {
-                                    break;
                                 }
                             }
                         }
-                    });
+                        None => {
+                            error!("No task for mac: {:X?}", wrc.mac);
+                        }
+                    }
                 }
-                WRCPayload::InlineJointData(_) => {
-                    debug!("unimplemented!(\"InlineJointData\")");
+            }
+
+            if !mac_to_serial.contains_key(&wrc.mac) {
+                if let Err(e) = query_serial(&wrc, &mut port) {
+                    error!("query_serial failed: {}", e);
+                } else {
+                    mac_to_seqid_list
+                        .entry(wrc.mac)
+                        .or_insert(vec![])
+                        .push((0, WRCPacketType::GetInfo));
                 }
             }
         }
@@ -348,6 +547,7 @@ pub fn com_process<'a>(
                     tx.send(ResponseAction::BindResponse(w)).unwrap();
                     return None;
                 }
+
                 for i in serial_to_mac.iter() {
                     if !serial_to_name.contains_key(i.0) {
                         name_to_serial.insert(w.connect_id.clone(), *i.0);
@@ -366,99 +566,93 @@ pub fn com_process<'a>(
             Ok(RequiredAction::BindWrench(target)) => {
                 connection_pending.push(target);
             }
-            Ok(RequiredAction::CheckConnect(mut target)) => {
-                target.status = false;
-
-                if !serial_to_mac.contains_key(&target.wrench_serial) {
-                    tx.send(ResponseAction::ConnectStatus(target))?;
-                    continue;
+            Ok(RequiredAction::CheckConnect(target)) => {
+                if let Err(e) = check_connect(target, &serial_to_mac, &last_heart_beat, &tx) {
+                    error!("check_connect failed: {}", e);
                 }
-                let mac = serial_to_mac[&target.wrench_serial];
-
-                if !last_heart_beat.contains_key(&mac) {
-                    tx.send(ResponseAction::ConnectStatus(target))?;
-                    continue;
-                }
-                let last_hb = last_heart_beat[&mac];
-
-                if last_hb.elapsed() < Duration::from_secs(30) {
-                    target.status = true;
-                }
-
-                tx.send(ResponseAction::ConnectStatus(target))?;
             }
             Ok(RequiredAction::SendTask((msg_id, target))) => {
-                let mut task_info = TaskInfo {
+                if let Err(e) = action_send_task(
                     msg_id,
-                    wrench_serial: 0,
-                    status: false,
-                };
-                if target.is_empty() {
-                    error!("empty task");
-                    continue;
+                    target,
+                    &tx,
+                    &serial_to_mac,
+                    &mut mac_to_tasks,
+                    &mac_to_seqid_list,
+                    &mut port,
+                ) {
+                    error!("action_send_task failed: {}", e);
                 }
-                if target[0].wrench_serial.is_none() {
-                    error!("serial number should not be None");
-                    continue;
-                }
-                let wrench_serial =
-                    match u128::from_str_radix(target[0].wrench_serial.as_ref().unwrap(), 16) {
-                        Ok(s) => s,
-                        Err(_) => {
-                            error!("invalid serial number");
-                            continue;
-                        }
-                    };
-                task_info.wrench_serial = wrench_serial;
-                let mac = match serial_to_mac.get(&wrench_serial) {
-                    Some(&m) => m,
-                    None => {
-                        error!("unknown serial number");
-                        continue;
-                    }
-                };
-                mac_to_tasks
-                    .entry(mac)
-                    .and_modify(|v| {
-                        v.push((
-                            task_info.clone(),
-                            target.clone().into_iter().map(|t| (false, t)).collect(),
-                        ))
-                    })
-                    .or_insert(vec![(
-                        task_info,
-                        target.into_iter().map(|t| (false, t)).collect(),
-                    )]);
             }
             Err(_) => {}
         }
 
         for (mac, task) in mac_to_tasks.iter_mut() {
-            let seqid = match last_seqid.get(mac) {
-                Some(&s) => s,
+            let seqid = match mac_to_seqid_list.get(mac).and_then(|x| x.last()) {
+                Some(&(s, _)) => s,
                 None => {
                     error!("last seqid not found");
                     continue;
                 }
             };
-            for (task_info, task) in task.iter_mut() {
-                if task.iter().all(|(s, _)| *s) {
-                    continue;
-                }
-                if let Some((status, task)) = task.iter_mut().next() {
-                    if *status {
-                        break;
+
+            if !task.finished {
+                if last_query_timestamp.elapsed() >= Duration::from_secs(1) {
+                    last_query_timestamp = Instant::now();
+                    let joint_start =
+                        task.tasks
+                            .iter()
+                            .take(task.current as usize)
+                            .fold(0, |acc, x| {
+                                acc + x
+                                    .bolt_num
+                                    .clone()
+                                    .and_then(|x| x.parse::<u16>().ok())
+                                    .unwrap_or_default()
+                            });
+                    let joint_num = task
+                        .tasks
+                        .get(task.current as usize)
+                        .and_then(|x| x.bolt_num.clone().and_then(|x| x.parse::<u8>().ok()))
+                        .unwrap_or_default();
+                    if let Err(e) =
+                        get_joint_data(seqid + 1, *mac, joint_start, joint_num, &mut port)
+                    {
+                        error!("get joint data failed: {}", e);
+                    } else {
+                        match mac_to_seqid_list.get_mut(mac) {
+                            Some(seqid_list) => {
+                                seqid_list.push((seqid + 1, WRCPacketType::GetJointData));
+                            }
+                            None => {
+                                error!("seqid_list for mac {:?} not found", mac);
+                            }
+                        }
                     }
-                    if let Err(e) = send_task(task, seqid + 1, *mac, &mut port) {
-                        error!("send task failed: {}", e);
-                        tx.send(ResponseAction::TaskStatus(task_info.clone()))?;
-                        task_info.status = true;
-                    }
-                    *status = true;
                 }
-                break;
+                continue;
             }
-            task.retain(|t| !t.0.status);
+
+            if task.current + 1 >= task.tasks.len() as i32 {
+                continue;
+            }
+
+            task.current += 1;
+            task.finished = false;
+
+            let task_request = &task.tasks[task.current as usize];
+            if let Err(e) = send_task(task_request, seqid + 1, *mac, &mut port) {
+                error!("send task failed: {}", e);
+            } else {
+                match mac_to_seqid_list.get_mut(mac) {
+                    Some(seqid_list) => {
+                        seqid_list.push((seqid + 1, WRCPacketType::SetJoint));
+                    }
+                    None => {
+                        error!("seqid_list for mac {:?} not found", mac);
+                    }
+                }
+            }
         }
     }
 

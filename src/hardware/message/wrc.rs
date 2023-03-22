@@ -1,3 +1,5 @@
+use tracing::debug;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum WRCJointDataMode {
@@ -220,7 +222,7 @@ pub enum WRCPayload {
     Beep,
     JointData,
     StatusReport(WRCPayloadStatusReport),
-    InlineJointData(WRCPayloadInlineJointData),
+    InlineJointData(Vec<WRCPayloadInlineJointData>),
 }
 
 bitfield::bitfield! {
@@ -427,30 +429,39 @@ impl TryFrom<Vec<u8>> for WRCPacket {
                 })
             }
             15 => {
-                let mut joint_id = [0u8; 2];
-                joint_id.copy_from_slice(&payload[0..2]);
-                let joint_id = u16::from_le_bytes(joint_id);
-                let mut task_id = [0u8; 2];
-                task_id.copy_from_slice(&payload[2..4]);
-                let task_id = u16::from_le_bytes(task_id);
-                let mut unix_time = [0u8; 4];
-                unix_time.copy_from_slice(&payload[4..8]);
-                let unix_time = u32::from_le_bytes(unix_time);
-                let flag = WRCPayloadInlineJointDataFlag(payload[8]);
-                let mut torque = [0u8; 4];
-                torque.copy_from_slice(&payload[9..13]);
-                let torque = i32::from_le_bytes(torque);
-                let mut angle = [0u8; 2];
-                angle.copy_from_slice(&payload[13..15]);
-                let angle = i16::from_le_bytes(angle);
-                WRCPayload::InlineJointData(WRCPayloadInlineJointData {
-                    joint_id,
-                    task_id,
-                    unix_time,
-                    flag,
-                    torque,
-                    angle,
-                })
+                let mut payloads = vec![];
+                debug!("payload len: {}", payload.len());
+                debug!("payload: {:02X?}", payload);
+                for i in 0.. {
+                    if i * 15 >= payload.len() {
+                        break;
+                    }
+                    let mut joint_id = [0u8; 2];
+                    joint_id.copy_from_slice(&payload[(i * 15)..(i * 15 + 2)]);
+                    let joint_id = u16::from_le_bytes(joint_id);
+                    let mut task_id = [0u8; 2];
+                    task_id.copy_from_slice(&payload[(i * 15 + 2)..(i * 15 + 4)]);
+                    let task_id = u16::from_le_bytes(task_id);
+                    let mut unix_time = [0u8; 4];
+                    unix_time.copy_from_slice(&payload[(i * 15 + 4)..(i * 15 + 8)]);
+                    let unix_time = u32::from_le_bytes(unix_time);
+                    let flag = WRCPayloadInlineJointDataFlag(payload[8]);
+                    let mut torque = [0u8; 4];
+                    torque.copy_from_slice(&payload[(i * 15 + 9)..(i * 15 + 13)]);
+                    let torque = i32::from_le_bytes(torque);
+                    let mut angle = [0u8; 2];
+                    angle.copy_from_slice(&payload[(i * 15 + 13)..(i * 15 + 15)]);
+                    let angle = i16::from_le_bytes(angle);
+                    payloads.push(WRCPayloadInlineJointData {
+                        joint_id,
+                        task_id,
+                        unix_time,
+                        flag,
+                        torque,
+                        angle,
+                    });
+                }
+                WRCPayload::InlineJointData(payloads)
             }
             _ => {
                 return Err("Unknown packet type");
@@ -470,7 +481,7 @@ impl TryFrom<Vec<u8>> for WRCPacket {
 impl TryInto<Vec<u8>> for WRCPacket {
     type Error = &'static str;
 
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+    fn try_into(mut self) -> Result<Vec<u8>, Self::Error> {
         let mut result = vec![];
         result.extend_from_slice(&self.sequence_id.to_le_bytes());
         result.extend_from_slice(&self.mac.to_le_bytes());
@@ -536,12 +547,16 @@ impl TryInto<Vec<u8>> for WRCPacket {
                 result.extend_from_slice(&status_report.status.to_le_bytes());
             }
             WRCPayload::InlineJointData(inline_joint_data) => {
-                result.extend_from_slice(&inline_joint_data.joint_id.to_le_bytes());
-                result.extend_from_slice(&inline_joint_data.task_id.to_le_bytes());
-                result.extend_from_slice(&inline_joint_data.unix_time.to_le_bytes());
-                result.push(inline_joint_data.flag.0);
-                result.extend_from_slice(&inline_joint_data.torque.to_le_bytes());
-                result.extend_from_slice(&inline_joint_data.angle.to_le_bytes());
+                self.flag.set_variable_len(true);
+                result[6] = self.flag.0;
+                for inline_joint_data in inline_joint_data {
+                    result.extend_from_slice(&inline_joint_data.joint_id.to_le_bytes());
+                    result.extend_from_slice(&inline_joint_data.task_id.to_le_bytes());
+                    result.extend_from_slice(&inline_joint_data.unix_time.to_le_bytes());
+                    result.push(inline_joint_data.flag.0);
+                    result.extend_from_slice(&inline_joint_data.torque.to_le_bytes());
+                    result.extend_from_slice(&inline_joint_data.angle.to_le_bytes());
+                }
             }
         }
 
