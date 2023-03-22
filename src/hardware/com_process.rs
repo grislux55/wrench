@@ -343,6 +343,11 @@ pub fn com_process<'a>(
         connection_pending = connection_pending
             .into_iter()
             .filter_map(|mut w| {
+                if name_to_serial.contains_key(&w.connect_id) {
+                    w.wrench_serial = name_to_serial[&w.connect_id];
+                    tx.send(ResponseAction::BindResponse(w)).unwrap();
+                    return None;
+                }
                 for i in serial_to_mac.iter() {
                     if !serial_to_name.contains_key(i.0) {
                         name_to_serial.insert(w.connect_id.clone(), *i.0);
