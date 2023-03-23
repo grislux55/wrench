@@ -107,17 +107,18 @@ pub fn read_write_loop<'a>(
     let port = port.into();
     let mut opened_port = None;
 
+    debug!("Starting read write loop on port {}", port);
     while !exit_required.load(Ordering::Acquire) {
         if opened_port.is_none() {
             opened_port = open_port(port.clone(), exit_required.clone());
+            if opened_port.is_some() {
+                debug!("Port: {} opened", port);
+            }
             continue;
         }
 
         if let Some(readed) = reader(exit_required.clone(), opened_port.as_mut().unwrap()) {
             tx.send(readed)?;
-        } else {
-            opened_port = None;
-            continue;
         }
 
         if let Ok(packet) = rx.try_recv() {

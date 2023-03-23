@@ -411,7 +411,7 @@ pub fn com_process<'a>(
         if let Ok(wrc) = com.reader.try_recv() {
             if let Err(e) = process_com_message(&mut com, &wrc) {
                 error!("process_com_message failed: {}", e);
-            };
+            }
         }
 
         if let Ok(action) = rx.try_recv() {
@@ -423,6 +423,8 @@ pub fn com_process<'a>(
         if let Err(e) = com_update(&mut com, &tx) {
             error!("com_update failed: {}", e);
         }
+
+        std::thread::sleep(Duration::from_secs(1));
     }
 
     Ok(())

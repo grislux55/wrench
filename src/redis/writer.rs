@@ -10,6 +10,7 @@ use crate::redis::message::{
 use crate::AppConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 fn main_loop(
     config: &AppConfig,
@@ -95,7 +96,7 @@ fn main_loop(
                 }
             }
         } else {
-            std::thread::yield_now();
+            std::thread::sleep(Duration::from_secs(1));
         }
     }
 
