@@ -22,8 +22,8 @@ use crate::{
 
 use super::{
     message::wrc::{
-        WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadSetJoint,
-        WRCPayloadSetJointFlag,
+        WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
+        WRCPayloadSetJoint, WRCPayloadSetJointFlag,
     },
     sm7bits::{self, SM7BitControlBits, SM_7_BIT_END_BYTE},
 };
@@ -334,9 +334,11 @@ fn check_connect(
 pub struct PendingTask {
     pub finished: bool,
     pub current: i32,
+    pub current_task_id: u16,
     pub tasks: Vec<TaskRequestMsg>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn action_send_task(
     msg_id: String,
     target: Vec<TaskRequestMsg>,
@@ -344,6 +346,7 @@ fn action_send_task(
     serial_to_mac: &HashMap<u128, u32>,
     mac_to_tasks: &mut HashMap<u32, PendingTask>,
     mac_to_seqid_list: &HashMap<u32, Vec<(u16, WRCPacketType)>>,
+    mac_to_joint_num: &mut HashMap<u32, u16>,
     port: &mut Box<dyn SerialPort>,
 ) -> anyhow::Result<()> {
     let mut task_info = TaskInfo {
@@ -396,9 +399,11 @@ fn action_send_task(
             } else {
                 error!("no seqid found, task will not be cleared");
             }
+            mac_to_joint_num.insert(mac, 0);
             PendingTask {
                 finished: true,
                 current: -1,
+                current_task_id: 0,
                 tasks: target,
             }
         });
@@ -441,7 +446,10 @@ pub fn com_process<'a>(
     let mut last_heart_beat: HashMap<u32, Instant> = HashMap::new();
     let mut mac_to_seqid_list: HashMap<u32, Vec<(u16, WRCPacketType)>> = HashMap::new();
     let mut mac_to_tasks: HashMap<u32, PendingTask> = HashMap::new();
-    let mut last_query_timestamp: Instant = Instant::now();
+    let mut mac_to_joints: HashMap<u32, Vec<WRCPayloadInlineJointData>> = HashMap::new();
+    let mut mac_to_joint_num: HashMap<u32, u16> = HashMap::new();
+    let mut mac_to_query_timestamp: HashMap<u32, Instant> = HashMap::new();
+    let mut mac_to_task_id_map: HashMap<u32, HashMap<u16, String>> = HashMap::new();
 
     while !exit_required.load(Ordering::Acquire) {
         let readed = reader(exit_required.clone(), &mut port);
@@ -452,23 +460,36 @@ pub fn com_process<'a>(
             //     "Mac: {:X?} LastHeartBeat: {:X?}",
             //     wrc.mac, last_heart_beat[&wrc.mac]
             // );
+            if let WRCPayload::InfoSerial(ref info_serial) = wrc.payload {
+                debug!(
+                    "Mac: {:X?} Serial: {:X?}",
+                    wrc.mac,
+                    u128::from_le_bytes(info_serial.serial)
+                );
+                mac_to_serial.insert(wrc.mac, u128::from_le_bytes(info_serial.serial));
+                serial_to_mac.insert(u128::from_le_bytes(info_serial.serial), wrc.mac);
+            }
+
+            if !mac_to_serial.contains_key(&wrc.mac) {
+                if let Err(e) = query_serial(&wrc, &mut port) {
+                    error!("query_serial failed: {}", e);
+                } else {
+                    mac_to_seqid_list
+                        .entry(wrc.mac)
+                        .or_insert(vec![])
+                        .push((0, WRCPacketType::GetInfo));
+                }
+                continue;
+            }
 
             match wrc.payload {
-                WRCPayload::InfoSerial(ref info_serial) => {
-                    debug!(
-                        "Mac: {:X?} Serial: {:X?}",
-                        wrc.mac,
-                        u128::from_le_bytes(info_serial.serial)
-                    );
-                    mac_to_serial.insert(wrc.mac, u128::from_le_bytes(info_serial.serial));
-                    serial_to_mac.insert(u128::from_le_bytes(info_serial.serial), wrc.mac);
-                }
+                WRCPayload::InfoSerial(_) => {}
                 WRCPayload::InfoGeneric(ref info_generic) => {
                     debug!(
                         "Mac: {:X?} LastSeqId: {:X?}",
                         wrc.mac, info_generic.last_server_packet_seqid
                     );
-                    // mac_to_seqid_list.entry(wrc.mac).or_insert(vec![]);
+                    mac_to_joint_num.insert(wrc.mac, info_generic.joint_count);
                 }
                 WRCPayload::InfoTiming(_) => {
                     debug!("unimplemented!(\"InfoTiming\")");
@@ -508,33 +529,13 @@ pub fn com_process<'a>(
                 }
                 WRCPayload::InlineJointData(ref inline_joint_data) => {
                     debug!("{:?}", inline_joint_data);
-                    match mac_to_tasks.get_mut(&wrc.mac) {
-                        Some(tasks) => {
-                            if let Some(task) = tasks.tasks.get_mut(tasks.current as usize) {
-                                let ok_num =
-                                    inline_joint_data.iter().filter(|j| j.flag.is_ok()).count();
-                                if let Some(ref bolt_num) = task.bolt_num {
-                                    if Some(ok_num as u16) == bolt_num.parse::<u16>().ok() {
-                                        tasks.finished = true;
-                                    }
-                                }
-                            }
+                    let target = mac_to_joints.entry(wrc.mac).or_insert(vec![]);
+                    for recv in inline_joint_data.iter() {
+                        if target.iter().any(|x| x.joint_id == recv.joint_id) {
+                            continue;
                         }
-                        None => {
-                            error!("No task for mac: {:X?}", wrc.mac);
-                        }
+                        target.push(recv.clone());
                     }
-                }
-            }
-
-            if !mac_to_serial.contains_key(&wrc.mac) {
-                if let Err(e) = query_serial(&wrc, &mut port) {
-                    error!("query_serial failed: {}", e);
-                } else {
-                    mac_to_seqid_list
-                        .entry(wrc.mac)
-                        .or_insert(vec![])
-                        .push((0, WRCPacketType::GetInfo));
                 }
             }
         }
@@ -579,6 +580,7 @@ pub fn com_process<'a>(
                     &serial_to_mac,
                     &mut mac_to_tasks,
                     &mac_to_seqid_list,
+                    &mut mac_to_joint_num,
                     &mut port,
                 ) {
                     error!("action_send_task failed: {}", e);
@@ -588,6 +590,10 @@ pub fn com_process<'a>(
         }
 
         for (mac, task) in mac_to_tasks.iter_mut() {
+            if task.current + 1 >= task.tasks.len() as i32 && task.finished {
+                continue;
+            }
+
             let seqid = match mac_to_seqid_list.get(mac).and_then(|x| x.last()) {
                 Some(&(s, _)) => s,
                 None => {
@@ -596,27 +602,51 @@ pub fn com_process<'a>(
                 }
             };
 
-            if !task.finished {
-                if last_query_timestamp.elapsed() >= Duration::from_secs(1) {
-                    last_query_timestamp = Instant::now();
-                    let joint_start =
-                        task.tasks
+            if let Some(t) = task.tasks.get_mut(task.current as usize) {
+                let ok_num = mac_to_joints
+                    .get(mac)
+                    .map(|joints| {
+                        joints
                             .iter()
-                            .take(task.current as usize)
-                            .fold(0, |acc, x| {
-                                acc + x
-                                    .bolt_num
-                                    .clone()
-                                    .and_then(|x| x.parse::<u16>().ok())
-                                    .unwrap_or_default()
-                            });
-                    let joint_num = task
-                        .tasks
-                        .get(task.current as usize)
-                        .and_then(|x| x.bolt_num.clone().and_then(|x| x.parse::<u8>().ok()))
-                        .unwrap_or_default();
+                            .filter(|j| j.task_id == task.current_task_id)
+                            .filter(|j| j.flag.is_ok())
+                            .count()
+                    })
+                    .unwrap_or_default();
+                if ok_num
+                    == t.bolt_num
+                        .as_ref()
+                        .unwrap_or(&"0".to_string())
+                        .parse::<usize>()
+                        .unwrap_or_default()
+                {
+                    debug!("task {} finished", task.current_task_id);
+                    task.finished = true;
+                }
+            }
+
+            let joints_start = mac_to_joints
+                .get(mac)
+                .map(|x| x.len() as u16)
+                .unwrap_or_default();
+            let joints_num = mac_to_joint_num
+                .get(mac)
+                .cloned()
+                .unwrap_or_default()
+                .saturating_sub(joints_start) as u8;
+
+            if !task.finished {
+                if joints_num > 0
+                    && mac_to_query_timestamp
+                        .entry(*mac)
+                        .or_insert(Instant::now())
+                        .elapsed()
+                        < Duration::from_secs(5)
+                {
+                    mac_to_query_timestamp.insert(*mac, Instant::now());
+                    debug!("joints_start: {}, joints_num: {}", joints_start, joints_num);
                     if let Err(e) =
-                        get_joint_data(seqid + 1, *mac, joint_start, joint_num, &mut port)
+                        get_joint_data(seqid + 1, *mac, joints_start, joints_num, &mut port)
                     {
                         error!("get joint data failed: {}", e);
                     } else {
@@ -625,7 +655,7 @@ pub fn com_process<'a>(
                                 seqid_list.push((seqid + 1, WRCPacketType::GetJointData));
                             }
                             None => {
-                                error!("seqid_list for mac {:?} not found", mac);
+                                error!("mac_to_seqid_list not found");
                             }
                         }
                     }
@@ -639,9 +669,18 @@ pub fn com_process<'a>(
 
             task.current += 1;
             task.finished = false;
+            task.current_task_id += 1;
 
-            let task_request = &task.tasks[task.current as usize];
-            if let Err(e) = send_task(task_request, seqid + 1, *mac, &mut port) {
+            let mut task_request = task.tasks[task.current as usize].clone();
+            mac_to_task_id_map
+                .entry(*mac)
+                .or_insert(HashMap::new())
+                .insert(
+                    task.current_task_id,
+                    task_request.task_id.unwrap_or("0".to_string()),
+                );
+            task_request.task_id = Some(task.current_task_id.to_string());
+            if let Err(e) = send_task(&task_request, seqid + 1, *mac, &mut port) {
                 error!("send task failed: {}", e);
             } else {
                 match mac_to_seqid_list.get_mut(mac) {

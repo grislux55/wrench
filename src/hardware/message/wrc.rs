@@ -134,7 +134,13 @@ bitfield::bitfield! {
     pub get_unit, set_unit: 7, 6;
 }
 
-#[derive(Debug)]
+impl Clone for WRCPayloadInlineJointDataFlag {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct WRCPayloadInlineJointData {
     pub joint_id: u16,
     pub task_id: u16,
@@ -445,7 +451,7 @@ impl TryFrom<Vec<u8>> for WRCPacket {
                     let mut unix_time = [0u8; 4];
                     unix_time.copy_from_slice(&payload[(i * 15 + 4)..(i * 15 + 8)]);
                     let unix_time = u32::from_le_bytes(unix_time);
-                    let flag = WRCPayloadInlineJointDataFlag(payload[8]);
+                    let flag = WRCPayloadInlineJointDataFlag(payload[i * 15 + 8]);
                     let mut torque = [0u8; 4];
                     torque.copy_from_slice(&payload[(i * 15 + 9)..(i * 15 + 13)]);
                     let torque = i32::from_le_bytes(torque);

@@ -54,6 +54,9 @@ pub fn loop_query(
         };
 
         for p in ports.iter() {
+            if p.port_name != "COM1" {
+                continue;
+            }
             if !last_com_threads.contains_key(&p.port_name) {
                 debug!("New port: {}", p.port_name);
                 match create_com_thread(
