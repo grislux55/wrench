@@ -11,10 +11,133 @@ use std::{
 use crate::message::{RequiredAction, ResponseAction};
 
 use bus::Bus;
+use serialport::SerialPort;
 use std::sync::Arc;
 use tracing::{debug, error};
 
-use super::com_process;
+use super::{
+    com_process,
+    message::wrc::WRCPacket,
+    sm7bits::{self, SM7BitControlBits, SM_7_BIT_END_BYTE},
+};
+
+fn open_port<'a>(
+    port: impl Into<std::borrow::Cow<'a, str>>,
+    exit_required: Arc<AtomicBool>,
+) -> Option<Box<dyn SerialPort>> {
+    let port = port.into();
+
+    while !exit_required.load(Ordering::Acquire) {
+        if let Ok(p) = serialport::new(port.clone(), 115_200)
+            .timeout(Duration::from_millis(1000))
+            .open()
+        {
+            return Some(p);
+        } else {
+            error!("Cannot open port {}, will retry after 1 sec", port);
+            std::thread::sleep(Duration::from_millis(1000));
+        }
+    }
+
+    None
+}
+
+fn read_packet(
+    exit_required: Arc<AtomicBool>,
+    port: &mut Box<dyn serialport::SerialPort>,
+) -> Vec<u8> {
+    let mut readed = vec![];
+    let mut serial_buf = [0];
+
+    while !exit_required.load(Ordering::Acquire) {
+        match port.read(&mut serial_buf) {
+            Ok(readed_size) => {
+                if readed_size == 0 {
+                    break;
+                }
+                if readed.is_empty()
+                    && serial_buf[0] != SM7BitControlBits::USBLocal as u8
+                    && serial_buf[0] != SM7BitControlBits::WRC as u8
+                {
+                    continue;
+                }
+
+                readed.push(serial_buf[0]);
+                if serial_buf[0] == SM_7_BIT_END_BYTE {
+                    break;
+                }
+            }
+            Err(_) => {
+                break;
+            }
+        }
+    }
+
+    readed
+}
+
+fn reader(exit_required: Arc<AtomicBool>, port: &mut Box<dyn SerialPort>) -> Option<WRCPacket> {
+    let readed = read_packet(exit_required, port);
+    if readed.is_empty() {
+        return None;
+    }
+
+    match sm7bits::decode(&readed) {
+        Ok((SM7BitControlBits::WRC, decoded)) => match WRCPacket::try_from(decoded) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                error!("Cannot parse: {readed:02X?}, reason: {e}");
+                None
+            }
+        },
+        Err(e) => {
+            error!("Cannot decode: {readed:02X?}, reason: {e}");
+            None
+        }
+        _ => None,
+    }
+}
+
+pub fn read_write_loop<'a>(
+    rx: mpsc::Receiver<WRCPacket>,
+    tx: mpsc::Sender<WRCPacket>,
+    port: impl Into<std::borrow::Cow<'a, str>>,
+    exit_required: Arc<AtomicBool>,
+) -> anyhow::Result<()> {
+    let port = port.into();
+    let mut opened_port = None;
+
+    while !exit_required.load(Ordering::Acquire) {
+        if opened_port.is_none() {
+            opened_port = open_port(port.clone(), exit_required.clone());
+            continue;
+        }
+
+        if let Some(readed) = reader(exit_required.clone(), opened_port.as_mut().unwrap()) {
+            tx.send(readed)?;
+        } else {
+            opened_port = None;
+            continue;
+        }
+
+        if let Ok(packet) = rx.try_recv() {
+            match TryInto::<Vec<u8>>::try_into(packet) {
+                Ok(data) => {
+                    let encoded = sm7bits::encode(&data, SM7BitControlBits::WRC);
+                    if let Err(e) = opened_port.as_mut().unwrap().write_all(&encoded) {
+                        error!("Cannot write to port: {}", e);
+                        opened_port = None;
+                    }
+                }
+                Err(e) => {
+                    error!("Cannot convert packet to bytes: {}", e);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 fn create_com_thread(
     exit_required: Arc<AtomicBool>,
@@ -54,9 +177,6 @@ pub fn loop_query(
         };
 
         for p in ports.iter() {
-            if p.port_name != "COM1" {
-                continue;
-            }
             if !last_com_threads.contains_key(&p.port_name) {
                 debug!("New port: {}", p.port_name);
                 match create_com_thread(
@@ -80,6 +200,6 @@ pub fn loop_query(
     for (s, h) in com_thread_handles {
         if let Err(e) = h.join() {
             error!("Can't join com thread: {} {:?}", s, e);
-        };
+        }
     }
 }
