@@ -1,3 +1,6 @@
+mod message;
+mod redis;
+
 use std::{
     collections::HashMap,
     str::FromStr,
@@ -22,16 +25,14 @@ use crate::{
     redis::message::TaskRequestMsg,
 };
 
+use self::{message::process_com_message, redis::process_message_from_redis};
+
 use super::{
-    message::{
-        com::process_com_message,
-        wrc::{
-            WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
-            WRCPayloadSetJoint, WRCPayloadSetJointFlag,
-        },
+    message::wrc::{
+        WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
+        WRCPayloadSetJoint, WRCPayloadSetJointFlag,
     },
     port::read_write_loop,
-    redis::process_message_from_redis,
 };
 
 fn send_task(

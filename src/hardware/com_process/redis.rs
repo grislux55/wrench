@@ -9,7 +9,7 @@ use crate::{
     redis::message::TaskRequestMsg,
 };
 
-use super::com_process::{ComProcess, PendingTask};
+use super::{ComProcess, PendingTask};
 
 fn check_connect(
     com: &mut ComProcess,

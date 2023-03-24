@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::hardware::com_process::ComProcess;
 
-use super::wrc::{
+use crate::hardware::message::wrc::{
     WRCPacket, WRCPacketFlag, WRCPacketType, WRCPayload, WRCPayloadGetInfo, WRCPayloadGetInfoFlag,
 };
 
