@@ -1,5 +1,5 @@
 use redis::Commands;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::message::ResponseAction;
@@ -12,24 +12,36 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+fn publish_msg<T: serde::Serialize>(
+    con: &mut redis::Connection,
+    queue: &str,
+    msg: T,
+) -> anyhow::Result<()> {
+    let msg = serde_json::to_string(&msg)?;
+    info!("发布消息: {} 到 Redis", msg);
+    con.publish(queue, msg)?;
+    Ok(())
+}
+
 fn main_loop(
     config: &AppConfig,
     mut con: redis::Connection,
     exit_required: Arc<AtomicBool>,
     rx: &mpsc::Receiver<ResponseAction>,
 ) -> anyhow::Result<()> {
-    debug!(
-        "Redis writer listening on {}/{}",
+    info!(
+        "已在目标 Redis: {} 上的 {} 队列进行发布循环, 将在收取主线程的数据之后进行发布",
         config.database.uri, config.database.queue
     );
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(msg) = rx.try_recv() {
+            if cfg!(debug_assertions) {
+                debug!("收到主线程的消息: {:?}", msg);
+            } else {
+                info!("收到主线程的消息: {}", msg);
+            }
             match msg {
                 ResponseAction::BindResponse(info) => {
-                    debug!(
-                        "bind serial: {:X} to {}",
-                        info.wrench_serial, info.connect_id
-                    );
                     let bind_response = BindResponse {
                         msg_id: Uuid::new_v4().simple().to_string(),
                         handler_name: "TOPIC_WRENCH_SERIAL_INIT_ASK".to_string(),
@@ -40,16 +52,9 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    con.publish(
-                        config.database.queue.as_str(),
-                        serde_json::to_string(&bind_response)?,
-                    )?;
+                    publish_msg(&mut con, config.database.queue.as_str(), bind_response)?;
                 }
                 ResponseAction::ConnectStatus(info) => {
-                    debug!(
-                        "serial: {:X} connect status: {}",
-                        info.wrench_serial, info.status
-                    );
                     let connect_response = ConnectResponse {
                         msg_id: Uuid::new_v4().simple().to_string(),
                         handler_name: "TOPIC_WRENCH_CONNECTION_ASK".to_string(),
@@ -66,13 +71,9 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    con.publish(
-                        config.database.queue.as_str(),
-                        serde_json::to_string(&connect_response)?,
-                    )?;
+                    publish_msg(&mut con, config.database.queue.as_str(), connect_response)?;
                 }
                 ResponseAction::TaskStatus(info) => {
-                    debug!("msg id: {} status: {}", info.msg_id, info.status);
                     let task_response = TaskResponse {
                         msg_id: Uuid::new_v4().simple().to_string(),
                         handler_name: "TOPIC_WRENCH_TASK_UP_ASK".to_string(),
@@ -89,10 +90,7 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    con.publish(
-                        config.database.queue.as_str(),
-                        serde_json::to_string(&task_response)?,
-                    )?;
+                    publish_msg(&mut con, config.database.queue.as_str(), task_response)?;
                 }
             }
         } else {
@@ -107,6 +105,7 @@ fn get_con(config: &AppConfig) -> anyhow::Result<redis::Connection> {
     let client = redis::Client::open(config.database.uri.clone())?;
     let con = client.get_connection()?;
 
+    info!("已连接到 Redis: {}", config.database.uri);
     Ok(con)
 }
 
@@ -119,12 +118,12 @@ pub fn write_redis(
         match get_con(config) {
             Ok(con) => {
                 if let Err(e) = main_loop(config, con, exit_required.clone(), &rx) {
-                    error!("redis writer error: {}", e);
+                    error!("Redis 发布线程出现错误: {}, 尝试重新获取 Redis 连接", e);
                 }
             }
             Err(e) => {
-                error!("redis connection error: {}", e);
-                std::thread::yield_now();
+                error!("无法连接到 Redis, 原因: {}, 将在 1 秒后进行重连", e);
+                std::thread::sleep(Duration::from_secs(1));
             }
         }
     }

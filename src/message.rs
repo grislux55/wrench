@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::redis::message::TaskRequestMsg;
 
 #[derive(Debug, Clone, Default)]
@@ -28,9 +30,29 @@ pub enum RequiredAction {
     SendTask((String, Vec<TaskRequestMsg>)),
 }
 
+impl Display for RequiredAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RequiredAction::BindWrench(_) => write!(f, "RequiredAction::BindWrench"),
+            RequiredAction::CheckConnect(_) => write!(f, "RequiredAction::CheckConnect"),
+            RequiredAction::SendTask(_) => write!(f, "RequiredAction::SendTask"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ResponseAction {
     BindResponse(WrenchInfo),
     ConnectStatus(ConnectInfo),
     TaskStatus(TaskInfo),
+}
+
+impl Display for ResponseAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResponseAction::BindResponse(_) => write!(f, "ResponseAction::BindResponse"),
+            ResponseAction::ConnectStatus(_) => write!(f, "ResponseAction::ConnectStatus"),
+            ResponseAction::TaskStatus(_) => write!(f, "ResponseAction::TaskStatus"),
+        }
+    }
 }

@@ -50,7 +50,7 @@ fn clear_task(com: &mut ComProcess, seqid: u16, mac: u32) -> anyhow::Result<()> 
         payload_len: 0u8,
         payload: WRCPayload::ClearJointData,
     };
-    debug!("Sending clear task message by mac: {:X?}", mac);
+    debug!("向Mac地址为: {:X?} 的扳手发送清空任务信号", mac);
     com.writer.send(clear_packet)?;
 
     Ok(())
@@ -70,19 +70,19 @@ fn send_task(
 
     if target.is_empty() {
         tx.send(ResponseAction::TaskStatus(task_info))?;
-        bail!("empty task");
+        bail!("空的任务列表");
     }
 
     if target[0].wrench_serial.is_none() {
         tx.send(ResponseAction::TaskStatus(task_info))?;
-        bail!("serial number should not be None");
+        bail!("wrench_serial不可以为空");
     }
 
     let wrench_serial = match u128::from_str_radix(target[0].wrench_serial.as_ref().unwrap(), 16) {
         Ok(s) => s,
         Err(_) => {
             tx.send(ResponseAction::TaskStatus(task_info))?;
-            bail!("invalid serial number");
+            bail!("wrench_serial值不合法");
         }
     };
     task_info.wrench_serial = wrench_serial;
@@ -91,7 +91,7 @@ fn send_task(
         Some(&m) => m,
         None => {
             tx.send(ResponseAction::TaskStatus(task_info))?;
-            bail!("unknown serial number");
+            bail!("未知的wrench_serial");
         }
     };
 
@@ -99,7 +99,10 @@ fn send_task(
         if let Some(&(seqid, _)) = com.data.mac_to_seqid_list.get(&mac).and_then(|x| x.last()) {
             clear_task(com, seqid, mac)?;
         } else {
-            error!("no seqid found, task will not be cleared");
+            error!(
+                "找不到Mac地址为: {:X?} 的扳手的seqid, 扳手原有任务不清除",
+                mac
+            );
         }
         com.data.mac_to_joint_num.insert(mac, 0);
     }

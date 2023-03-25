@@ -1,4 +1,5 @@
 mod message;
+mod port;
 mod redis;
 
 use std::{
@@ -17,7 +18,7 @@ use anyhow::bail;
 use bus::BusReader;
 use num_bigfloat::BigFloat;
 
-use tracing::{debug, error};
+use tracing::{debug, error, info, span, Level};
 
 use crate::{
     hardware::message::wrc::{WRCPacketFlag, WRCPayload},
@@ -25,14 +26,13 @@ use crate::{
     redis::message::TaskRequestMsg,
 };
 
-use self::{message::process_com_message, redis::process_message_from_redis};
+use self::{
+    message::process_com_message, port::read_write_loop, redis::process_message_from_redis,
+};
 
-use super::{
-    message::wrc::{
-        WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
-        WRCPayloadSetJoint, WRCPayloadSetJointFlag,
-    },
-    port::read_write_loop,
+use super::message::wrc::{
+    WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
+    WRCPayloadSetJoint, WRCPayloadSetJointFlag,
 };
 
 fn send_task(
@@ -41,114 +41,113 @@ fn send_task(
     mac: u32,
     sender: &mpsc::Sender<WRCPacket>,
 ) -> anyhow::Result<()> {
-    debug!("Sending task to mac: {mac:08X}", mac = mac);
     let torque = {
         if task.torque.is_none() {
-            bail!("Torque is not set");
+            bail!("torque不能为空");
         }
         match BigFloat::from_str(task.torque.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(1000);
                 t.to_i128().unwrap() as i32
             }
-            Err(e) => bail!("Cannot parse torque: {e}"),
+            Err(e) => bail!("无法解析torque: {e}"),
         }
     };
     let torque_angle_start = {
         if task.torque_angle_start.is_none() {
-            bail!("Torque angle start is not set");
+            bail!("torque_angle_start不能为空");
         }
         match BigFloat::from_str(task.torque_angle_start.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(1000);
                 t.to_i128().unwrap() as i32
             }
-            Err(e) => bail!("Cannot parse torque angle start: {e}"),
+            Err(e) => bail!("无法解析torque_angle_start: {e}"),
         }
     };
     let torque_upper_tol = {
         if task.torque_deviation_up.is_none() {
-            bail!("Torque upper tolerance is not set");
+            bail!("torque_deviation_up不能为空");
         }
         match BigFloat::from_str(task.torque_deviation_up.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(1000);
                 t.to_i128().unwrap() as i32
             }
-            Err(e) => bail!("Cannot parse torque upper tolerance: {e}"),
+            Err(e) => bail!("无法解析torque_deviation_up: {e}"),
         }
     };
     let torque_lower_tol = {
         if task.torque_deviation_down.is_none() {
-            bail!("Torque lower tolerance is not set");
+            bail!("torque_deviation_down不能为空");
         }
         match BigFloat::from_str(task.torque_deviation_down.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(1000);
                 t.to_i128().unwrap() as i32
             }
-            Err(e) => bail!("Cannot parse torque lower tolerance: {e}"),
+            Err(e) => bail!("无法解析torque_deviation_down: {e}"),
         }
     };
     let angle = {
         if task.angle.is_none() {
-            bail!("Angle is not set");
+            bail!("angle不能为空");
         }
         match BigFloat::from_str(task.angle.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(10);
                 t.to_i128().unwrap() as i16
             }
-            Err(e) => bail!("Cannot parse angle: {e}"),
+            Err(e) => bail!("无法解析angle: {e}"),
         }
     };
     let angle_upper_tol = {
         if task.angle_deviation_up.is_none() {
-            bail!("Angle upper tolerance is not set");
+            bail!("angle_deviation_up不能为空");
         }
         match BigFloat::from_str(task.angle_deviation_up.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(10);
                 t.to_i128().unwrap() as i16
             }
-            Err(e) => bail!("Cannot parse angle upper tolerance: {e}"),
+            Err(e) => bail!("无法解析angle_deviation_up: {e}"),
         }
     };
     let angle_lower_tol = {
         if task.angle_deviation_down.is_none() {
-            bail!("Angle lower tolerance is not set");
+            bail!("angle_deviation_down不能为空");
         }
         match BigFloat::from_str(task.angle_deviation_down.as_ref().unwrap()) {
             Ok(mut t) => {
                 t *= BigFloat::from(10);
                 t.to_i128().unwrap() as i16
             }
-            Err(e) => bail!("Cannot parse angle lower tolerance: {e}"),
+            Err(e) => bail!("无法解析angle_deviation_down: {e}"),
         }
     };
     let task_repeat_times = {
         if task.bolt_num.is_none() {
-            bail!("Task bolt num is not set");
+            bail!("bolt_num不能为空");
         }
         task.bolt_num.as_ref().unwrap().parse::<u16>()?
     };
     let task_id = {
         if task.task_id.is_none() {
-            bail!("Task id is not set");
+            bail!("task_id不能为空");
         }
         task.task_id.as_ref().unwrap().parse::<u16>()?
     };
     let mut task_flag = WRCPayloadSetJointFlag(0);
     if task.work_mode.is_none() {
-        bail!("Work mode is not set");
+        bail!("work_mode不能为空");
     }
     task_flag.set_mode(task.work_mode.as_ref().unwrap().parse::<u8>()?);
     if task.control_mode.is_none() {
-        bail!("Control mode is not set");
+        bail!("control_mode不能为空");
     }
     task_flag.set_method(task.control_mode.as_ref().unwrap().parse::<u8>()?);
     if task.unit.is_none() {
-        bail!("Unit is not set");
+        bail!("unit不能为空");
     }
     task_flag.set_unit(task.unit.as_ref().unwrap().parse::<u8>()?);
 
@@ -272,7 +271,7 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
         let seqid = match com.data.mac_to_seqid_list.get(mac).and_then(|x| x.last()) {
             Some(&(s, _)) => s,
             None => {
-                error!("last seqid not found");
+                error!("没有找到 Mac: {:X} 的 seqid", mac);
                 continue;
             }
         };
@@ -297,7 +296,7 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
                     .parse::<usize>()
                     .unwrap_or_default()
             {
-                debug!("task {} finished", task.current_task_id);
+                debug!("任务 {} 结束", task.current_task_id);
                 task.finished = true;
             }
         }
@@ -327,18 +326,17 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
                     < Duration::from_secs(5)
             {
                 com.data.mac_to_query_timestamp.insert(*mac, Instant::now());
-                debug!("joints_start: {}, joints_num: {}", joints_start, joints_num);
                 if let Err(e) =
                     get_joint_data(seqid + 1, *mac, joints_start, joints_num, &com.writer)
                 {
-                    error!("get joint data failed: {}", e);
+                    error!("获取扳手数据失败: {}", e);
                 } else {
                     match com.data.mac_to_seqid_list.get_mut(mac) {
                         Some(seqid_list) => {
                             seqid_list.push((seqid + 1, WRCPacketType::GetJointData));
                         }
                         None => {
-                            error!("mac_to_seqid_list not found");
+                            error!("找不到 Mac: {:X} 的 seqid 列表", mac);
                         }
                     }
                 }
@@ -365,14 +363,14 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
             );
         task_request.task_id = Some(task.current_task_id.to_string());
         if let Err(e) = send_task(&task_request, seqid + 1, *mac, &com.writer) {
-            error!("send task failed: {}", e);
+            error!("发送任务失败: {}", e);
         } else {
             match com.data.mac_to_seqid_list.get_mut(mac) {
                 Some(seqid_list) => {
                     seqid_list.push((seqid + 1, WRCPacketType::SetJoint));
                 }
                 None => {
-                    error!("seqid_list for mac {:?} not found", mac);
+                    error!("找不到 Mac: {:X} 的 seqid 列表", mac);
                 }
             }
         }
@@ -386,18 +384,20 @@ pub fn com_process<'a>(
     port: impl Into<std::borrow::Cow<'a, str>>,
     tx: mpsc::Sender<ResponseAction>,
     mut rx: BusReader<RequiredAction>,
-) -> anyhow::Result<()> {
+) {
+    let port = port.into();
     let mut com = {
         let (thread_writer, reader) = mpsc::channel();
         let (writer, thread_reader) = mpsc::channel();
 
         let handle = {
-            let port = port.into().to_string();
+            let port = port.to_string();
             let exit_required = exit_required.clone();
+            info!("启动串口读写线程");
             std::thread::spawn(move || {
-                if let Err(e) = read_write_loop(thread_reader, thread_writer, port, exit_required) {
-                    error!("read_write_loop failed: {}", e);
-                }
+                span!(Level::ERROR, "串口读写线程", port = %port).in_scope(|| {
+                    read_write_loop(thread_reader, thread_writer, &port, exit_required);
+                });
             })
         };
         ComProcess {
@@ -408,25 +408,26 @@ pub fn com_process<'a>(
         }
     };
 
+    info!("启动处理循环");
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(wrc) = com.reader.try_recv() {
+            debug!("收到串口消息: {:?}", wrc);
             if let Err(e) = process_com_message(&mut com, &wrc) {
-                error!("process_com_message failed: {}", e);
+                error!("处理串口消息失败: {}", e);
             }
         }
 
         if let Ok(action) = rx.try_recv() {
+            debug!("收到 Redis 消息: {:?}", action);
             if let Err(e) = process_message_from_redis(&mut com, action, &tx) {
-                error!("process_message_from_redis failed: {}", e);
+                error!("处理 Redis 消息失败: {}", e);
             }
         }
 
         if let Err(e) = com_update(&mut com, &tx) {
-            error!("com_update failed: {}", e);
+            error!("定时更新失败: {}", e);
         }
 
         std::thread::sleep(Duration::from_secs(1));
     }
-
-    Ok(())
 }
