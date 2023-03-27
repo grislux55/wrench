@@ -143,7 +143,8 @@ fn main_loop(
                 if s == "TOPIC_WRENCH_SERIAL_INIT_ASK"
                     || s == "TOPIC_WRENCH_CONNECTION_ASK"
                     || s == "TOPIC_WRENCH_TASK_UP_ASK"
-                    || s == "TOPIC_WRENCH_WORK_COLLECTION_RECEIVE" => {}
+                    || s == "TOPIC_WRENCH_WORK_COLLECTION_RECEIVE"
+                    || s == "TOPIC_WRENCH_OTHER_COLLECTION_RECEIVE" => {}
             _ => {
                 error!("未知的消息格式");
             }

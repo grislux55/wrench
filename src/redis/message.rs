@@ -162,3 +162,31 @@ pub struct TaskCancel {
     pub current_time: String,
     pub msg_txt: TaskCancelMsg,
 }
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MiscInfoMsg {
+    pub wrench_serial: String,
+    pub title: Option<String>,
+    pub code: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub level: Option<String>,
+    pub consume_time: Option<String>,
+    pub use_time: Option<String>,
+    pub storage_num: Option<String>,
+    pub voltage: Option<String>,
+    pub status: Option<String>,
+    pub desc: Option<String>,
+    #[serde(rename = "type")]
+    pub msg_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MiscInfo {
+    pub msg_id: String,
+    pub handler_name: String,
+    pub current_time: String,
+    pub msg_txt: MiscInfoMsg,
+}

@@ -58,11 +58,21 @@ pub struct FinishedInfo {
 }
 
 #[derive(Debug, Clone)]
+pub struct BasicInfo {
+    pub wrench_serial: u128,
+    pub voltage: u32,
+    pub storage: u32,
+    pub use_time: u64,
+}
+
+#[derive(Debug, Clone)]
 pub enum ResponseAction {
     BindResponse(WrenchInfo),
     ConnectStatus(ConnectInfo),
     TaskStatus(TaskInfo),
     TaskFinished(FinishedInfo),
+    ConnectionTimeout(u128),
+    BasicStatus(BasicInfo),
 }
 
 impl Display for ResponseAction {
@@ -72,6 +82,8 @@ impl Display for ResponseAction {
             ResponseAction::ConnectStatus(_) => write!(f, "ResponseAction::ConnectStatus"),
             ResponseAction::TaskStatus(_) => write!(f, "ResponseAction::TaskStatus"),
             ResponseAction::TaskFinished(_) => write!(f, "ResponseAction::TaskFinished"),
+            ResponseAction::ConnectionTimeout(_) => write!(f, "ResponseAction::ConnectionTimeout"),
+            ResponseAction::BasicStatus(_) => write!(f, "ResponseAction::BasicStatus"),
         }
     }
 }

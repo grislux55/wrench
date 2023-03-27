@@ -1,7 +1,7 @@
 {
   "database": {
     "queue": "jeecg_redis_topic",
-    "uri": "redis://192.168.11.121:6379/10"
+    "uri": "redis://default:redispw@localhost:32768"
   },
   "port": ["COM4"]
 }

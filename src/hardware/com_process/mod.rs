@@ -20,7 +20,7 @@ use tracing::{debug, error, info, span, Level};
 
 use crate::{
     hardware::message::wrc::{WRCPacketFlag, WRCPayload},
-    message::{RequiredAction, ResponseAction, WrenchInfo},
+    message::{BasicInfo, RequiredAction, ResponseAction, WrenchInfo},
     redis::message::TaskRequestMsg,
 };
 
@@ -202,10 +202,31 @@ pub struct ComProcessData {
     pub mac_to_joint_num: HashMap<u32, u16>,
     pub mac_to_query_timestamp: HashMap<u32, Instant>,
     pub mac_to_task_id_map: HashMap<u32, HashMap<u16, String>>,
+    pub mac_to_last_info_beat: HashMap<u32, Instant>,
+    pub mac_to_voltage: HashMap<u32, u32>,
+    pub mac_to_use_time: HashMap<u32, u64>,
+    pub mac_to_first_heart_beat: HashMap<u32, Instant>,
 }
 
-fn drop_old_heart_beat(com: &mut ComProcess) -> anyhow::Result<()> {
+fn drop_old_heart_beat(
+    com: &mut ComProcess,
+    tx: &mpsc::Sender<ResponseAction>,
+) -> anyhow::Result<()> {
     for (mac, lhb) in com.data.last_heart_beat.iter() {
+        if lhb.elapsed() >= Duration::from_secs(35) {
+            if let Some(serial) = com.data.mac_to_serial.get(mac) {
+                com.data.serial_to_mac.remove(serial);
+                com.data.mac_to_last_info_beat.remove(mac);
+                *com.data.mac_to_use_time.entry(*mac).or_default() += com
+                    .data
+                    .mac_to_first_heart_beat
+                    .get(mac)
+                    .map(|x| x.elapsed().as_secs())
+                    .unwrap_or_default();
+                tx.send(ResponseAction::ConnectionTimeout(*serial))?;
+            }
+            com.data.mac_to_serial.remove(mac);
+        }
         if lhb.elapsed() >= Duration::from_secs(30) {
             query_serial(*mac, &com.writer)?;
         }
@@ -384,10 +405,70 @@ fn update_task_status(com: &mut ComProcess) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn per_wrench_heart_beat(
+    com: &mut ComProcess,
+    tx: &mpsc::Sender<ResponseAction>,
+) -> anyhow::Result<()> {
+    for (mac, last_heart_beat) in com.data.mac_to_last_info_beat.iter_mut() {
+        if last_heart_beat.elapsed() < Duration::from_secs(5 * 60) {
+            continue;
+        }
+        *last_heart_beat = Instant::now();
+        let serial = match com.data.mac_to_serial.get(mac) {
+            Some(&serial) => serial,
+            None => {
+                error!("找不到 Mac: {:X} 的序列号", mac);
+                continue;
+            }
+        };
+        let voltage = match com.data.mac_to_voltage.get(mac) {
+            Some(&voltage) => voltage,
+            None => {
+                error!("找不到 Mac: {:X} 的电压", mac);
+                continue;
+            }
+        };
+        let storage = match com.data.mac_to_joint_num.get(mac) {
+            Some(&storage) => storage as u32,
+            None => {
+                error!("找不到 Mac: {:X} 的存储空间", mac);
+                continue;
+            }
+        };
+        let use_time = {
+            let use_time = match com.data.mac_to_use_time.get(mac) {
+                Some(&use_time) => use_time,
+                None => {
+                    error!("找不到 Mac: {:X} 的使用时间", mac);
+                    continue;
+                }
+            };
+            let first_heart_beat = match com.data.mac_to_first_heart_beat.get(mac) {
+                Some(&first_heart_beat) => first_heart_beat,
+                None => {
+                    error!("找不到 Mac: {:X} 的上次心跳时间", mac);
+                    continue;
+                }
+            };
+            use_time + first_heart_beat.elapsed().as_secs()
+        };
+        tx.send(ResponseAction::BasicStatus(BasicInfo {
+            wrench_serial: serial,
+            voltage,
+            storage,
+            use_time,
+        }))?;
+    }
+
+    Ok(())
+}
+
 fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow::Result<()> {
-    drop_old_heart_beat(com)?;
+    drop_old_heart_beat(com, tx)?;
 
     bind_wrench(com, tx)?;
+
+    per_wrench_heart_beat(com, tx)?;
 
     update_task_status(com)?;
 

@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::{sync::mpsc, time::Instant};
 
 use tracing::debug;
@@ -11,14 +12,36 @@ use crate::hardware::message::wrc::{
 use crate::message::{FinishedInfo, ResponseAction};
 
 pub fn query_serial(mac: u32, sender: &mpsc::Sender<WRCPacket>) -> anyhow::Result<()> {
+    let mut flag = WRCPacketFlag(0);
+    flag.set_direction(true);
+    flag.set_type(6);
+    let mut payload_flag = WRCPayloadGetInfoFlag(0);
+    payload_flag.set_serial(true);
     let query_packet = WRCPacket {
         sequence_id: 0,
         mac,
-        flag: WRCPacketFlag(25),
+        flag,
         payload_len: 1u8,
-        payload: WRCPayload::GetInfo(WRCPayloadGetInfo {
-            flag: WRCPayloadGetInfoFlag(1),
-        }),
+        payload: WRCPayload::GetInfo(WRCPayloadGetInfo { flag: payload_flag }),
+    };
+
+    sender.send(query_packet)?;
+
+    Ok(())
+}
+
+pub fn query_energy(mac: u32, sender: &mpsc::Sender<WRCPacket>) -> anyhow::Result<()> {
+    let mut flag = WRCPacketFlag(0);
+    flag.set_direction(true);
+    flag.set_type(6);
+    let mut payload_flag = WRCPayloadGetInfoFlag(0);
+    payload_flag.set_energy(true);
+    let query_packet = WRCPacket {
+        sequence_id: 0,
+        mac,
+        flag,
+        payload_len: 1u8,
+        payload: WRCPayload::GetInfo(WRCPayloadGetInfo { flag: payload_flag }),
     };
 
     sender.send(query_packet)?;
@@ -59,11 +82,22 @@ pub fn process_com_message(
         com.data
             .serial_to_mac
             .insert(u128::from_le_bytes(info_serial.serial), wrc.mac);
+        com.data.mac_to_use_time.entry(wrc.mac).or_default();
+        com.data.mac_to_voltage.entry(wrc.mac).or_default();
+        com.data
+            .mac_to_last_info_beat
+            .entry(wrc.mac)
+            .or_insert(Instant::now() - Duration::from_secs(5 * 58));
+        com.data
+            .mac_to_first_heart_beat
+            .insert(wrc.mac, Instant::now());
+
         return Ok(());
     }
 
     if !com.data.mac_to_serial.contains_key(&wrc.mac) {
         query_serial(wrc.mac, &com.writer)?;
+        query_energy(wrc.mac, &com.writer)?;
         com.data
             .mac_to_seqid_list
             .entry(wrc.mac)
@@ -81,8 +115,10 @@ pub fn process_com_message(
         WRCPayload::InfoTiming(_) => {
             debug!("unimplemented!(\"InfoTiming\")");
         }
-        WRCPayload::InfoEnergy(_) => {
-            debug!("unimplemented!(\"InfoEnergy\")");
+        WRCPayload::InfoEnergy(info_energy) => {
+            com.data
+                .mac_to_voltage
+                .insert(wrc.mac, info_energy.battery_voltage_mv as u32);
         }
         WRCPayload::InfoNetwork(_) => {
             debug!("unimplemented!(\"InfoNetwork\")");

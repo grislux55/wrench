@@ -4,8 +4,8 @@ use uuid::Uuid;
 
 use crate::message::ResponseAction;
 use crate::redis::message::{
-    BindResponse, BindResponseMsg, ConnectResponse, ConnectResponseMsg, TaskResponse,
-    TaskResponseMsg, TaskStatus, TaskStatusMsg,
+    BindResponse, BindResponseMsg, ConnectResponse, ConnectResponseMsg, MiscInfo, MiscInfoMsg,
+    TaskResponse, TaskResponseMsg, TaskStatus, TaskStatusMsg,
 };
 use crate::AppConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -115,6 +115,52 @@ fn main_loop(
                         },
                     };
                     publish_msg(&mut con, config.database.queue.as_str(), task_response)?;
+                }
+                ResponseAction::ConnectionTimeout(info) => {
+                    let timeout_response = MiscInfo {
+                        msg_id: Uuid::new_v4().simple().to_string(),
+                        handler_name: "TOPIC_WRENCH_OTHER_COLLECTION_RECEIVE".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        msg_txt: MiscInfoMsg {
+                            wrench_serial: format!("{:X}", info),
+                            title: None,
+                            code: None,
+                            start_date: None,
+                            end_date: None,
+                            level: None,
+                            consume_time: None,
+                            use_time: None,
+                            storage_num: None,
+                            status: Some("2".to_string()),
+                            voltage: None,
+                            desc: Some("断开连接".to_string()),
+                            msg_type: "3".to_string(),
+                        },
+                    };
+                    publish_msg(&mut con, config.database.queue.as_str(), timeout_response)?;
+                }
+                ResponseAction::BasicStatus(info) => {
+                    let basic_response = MiscInfo {
+                        msg_id: Uuid::new_v4().simple().to_string(),
+                        handler_name: "TOPIC_WRENCH_OTHER_COLLECTION_RECEIVE".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        msg_txt: MiscInfoMsg {
+                            wrench_serial: format!("{:X}", info.wrench_serial),
+                            title: None,
+                            code: None,
+                            start_date: None,
+                            end_date: None,
+                            level: None,
+                            consume_time: None,
+                            use_time: Some(format!("{}", info.use_time)),
+                            storage_num: Some(format!("{}", info.storage)),
+                            status: Some("2".to_string()),
+                            voltage: Some(format!("{}", info.voltage)),
+                            desc: Some("扳手基础数据发送".to_string()),
+                            msg_type: "0".to_string(),
+                        },
+                    };
+                    publish_msg(&mut con, config.database.queue.as_str(), basic_response)?;
                 }
             }
         } else {
