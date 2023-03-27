@@ -204,7 +204,7 @@ pub struct ComProcessData {
     pub mac_to_task_id_map: HashMap<u32, HashMap<u16, String>>,
 }
 
-fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow::Result<()> {
+fn drop_old_heart_beat(com: &mut ComProcess) -> anyhow::Result<()> {
     for (mac, lhb) in com.data.last_heart_beat.iter() {
         if lhb.elapsed() >= Duration::from_secs(30) {
             query_serial(*mac, &com.writer)?;
@@ -214,6 +214,10 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
         .last_heart_beat
         .retain(|_, v| v.elapsed() <= Duration::from_secs(35));
 
+    Ok(())
+}
+
+fn bind_wrench(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow::Result<()> {
     com.data.connection_pending = com
         .data
         .connection_pending
@@ -240,6 +244,10 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
         })
         .collect();
 
+    Ok(())
+}
+
+fn update_task_status(com: &mut ComProcess) -> anyhow::Result<()> {
     for (mac, task) in com.data.mac_to_tasks.iter_mut() {
         if task.current + 1 >= task.tasks.len() as i32 && task.finished {
             continue;
@@ -286,58 +294,56 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
                         .count()
                 })
                 .unwrap_or_default();
-            if ok_num
-                == com_task
-                    .request
-                    .bolt_num
-                    .parse::<usize>()
-                    .unwrap_or_default()
-            {
+            let limit_num = com_task
+                .request
+                .bolt_num
+                .parse::<usize>()
+                .unwrap_or_default();
+            if ok_num == limit_num {
                 debug!("任务 {} 结束", task.current_task_id);
                 task.finished = true;
             }
         }
 
-        let joints_start = com
-            .data
-            .mac_to_joints
-            .get(mac)
-            .map(|x| x.len() as u16)
-            .unwrap_or_default();
-        let joints_num = com
-            .data
-            .mac_to_joint_num
-            .get(mac)
-            .cloned()
-            .unwrap_or_default()
-            .saturating_sub(joints_start) as u8;
-
         if !task.finished {
-            if joints_num > 0
-                && com
-                    .data
-                    .mac_to_query_timestamp
-                    .entry(*mac)
-                    .or_insert(Instant::now())
-                    .elapsed()
-                    >= Duration::from_secs(2)
-            {
+            let joints_start = com
+                .data
+                .mac_to_joints
+                .get(mac)
+                .map(|x| x.len() as u16)
+                .unwrap_or_default();
+            let joints_num = com
+                .data
+                .mac_to_joint_num
+                .get(mac)
+                .cloned()
+                .unwrap_or_default()
+                .saturating_sub(joints_start) as u8;
+            let is_time_out = com
+                .data
+                .mac_to_query_timestamp
+                .entry(*mac)
+                .or_insert(Instant::now())
+                .elapsed()
+                >= Duration::from_secs(2);
+
+            if joints_num > 0 && is_time_out {
                 com.data.mac_to_query_timestamp.insert(*mac, Instant::now());
-                if let Err(e) =
-                    get_joint_data(seqid + 1, *mac, joints_start, joints_num, &com.writer)
-                {
-                    error!("获取扳手数据失败: {}", e);
-                } else {
-                    match com.data.mac_to_seqid_list.get_mut(mac) {
+                match get_joint_data(seqid + 1, *mac, joints_start, joints_num, &com.writer) {
+                    Ok(_) => match com.data.mac_to_seqid_list.get_mut(mac) {
                         Some(seqid_list) => {
                             seqid_list.push((seqid + 1, WRCPacketType::GetJointData));
                         }
                         None => {
                             error!("找不到 Mac: {:X} 的 seqid 列表", mac);
                         }
+                    },
+                    Err(e) => {
+                        error!("获取扳手数据失败: {}", e);
                     }
                 }
             }
+
             continue;
         }
 
@@ -360,19 +366,30 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
             .or_insert(HashMap::new())
             .insert(task.current_task_id, com_task.request.task_id);
         com_task.request.task_id = task.current_task_id.to_string();
-        if let Err(e) = send_task(&com_task.request, seqid + 1, *mac, &com.writer) {
-            error!("发送任务失败: {}", e);
-        } else {
-            match com.data.mac_to_seqid_list.get_mut(mac) {
+        match send_task(&com_task.request, seqid + 1, *mac, &com.writer) {
+            Ok(_) => match com.data.mac_to_seqid_list.get_mut(mac) {
                 Some(seqid_list) => {
                     seqid_list.push((seqid + 1, WRCPacketType::SetJoint));
                 }
                 None => {
                     error!("找不到 Mac: {:X} 的 seqid 列表", mac);
                 }
+            },
+            Err(e) => {
+                error!("发送任务失败: {}", e);
             }
         }
     }
+
+    Ok(())
+}
+
+fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow::Result<()> {
+    drop_old_heart_beat(com)?;
+
+    bind_wrench(com, tx)?;
+
+    update_task_status(com)?;
 
     Ok(())
 }
