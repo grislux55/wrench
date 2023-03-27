@@ -66,6 +66,7 @@ fn run() -> anyhow::Result<()> {
     };
     let redis_writer = {
         let exit_required = exit_required.clone();
+        let config = config.clone();
         std::thread::spawn(move || {
             span!(Level::ERROR, "发布线程").in_scope(|| {
                 info!("启动 Redis 发布线程");
@@ -79,7 +80,7 @@ fn run() -> anyhow::Result<()> {
         std::thread::spawn(move || {
             span!(Level::ERROR, "串口线程").in_scope(|| {
                 info!("启动串口线程");
-                hardware::port::loop_query(exit_required, port_handler_tx, bus);
+                hardware::port::loop_query(exit_required, port_handler_tx, bus, config);
             });
         })
     };

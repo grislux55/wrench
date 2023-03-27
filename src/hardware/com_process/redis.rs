@@ -1,15 +1,15 @@
 use std::{sync::mpsc, time::Duration};
 
 use anyhow::bail;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
-    hardware::message::wrc::{WRCPacket, WRCPacketFlag, WRCPayload},
+    hardware::message::wrc::{WRCPacket, WRCPacketFlag, WRCPacketType, WRCPayload},
     message::{ConnectInfo, RequiredAction, ResponseAction, TaskInfo},
     redis::message::TaskRequestMsg,
 };
 
-use super::{ComProcess, PendingTask};
+use super::{ComProcess, ComTask, PendingTask};
 
 fn check_connect(
     com: &mut ComProcess,
@@ -30,7 +30,7 @@ fn check_connect(
     }
     let last_hb = com.data.last_heart_beat[&mac];
 
-    if last_hb.elapsed() < Duration::from_secs(30) {
+    if last_hb.elapsed() <= Duration::from_secs(35) {
         target.status = true;
     }
 
@@ -63,7 +63,7 @@ fn send_task(
     tx: &mpsc::Sender<ResponseAction>,
 ) -> anyhow::Result<()> {
     let mut task_info = TaskInfo {
-        msg_id,
+        msg_id: msg_id.clone(),
         wrench_serial: 0,
         status: false,
     };
@@ -73,12 +73,7 @@ fn send_task(
         bail!("空的任务列表");
     }
 
-    if target[0].wrench_serial.is_none() {
-        tx.send(ResponseAction::TaskStatus(task_info))?;
-        bail!("wrench_serial不可以为空");
-    }
-
-    let wrench_serial = match u128::from_str_radix(target[0].wrench_serial.as_ref().unwrap(), 16) {
+    let wrench_serial = match u128::from_str_radix(&target[0].wrench_serial, 16) {
         Ok(s) => s,
         Err(_) => {
             tx.send(ResponseAction::TaskStatus(task_info))?;
@@ -97,7 +92,12 @@ fn send_task(
 
     if com.data.mac_to_tasks.get(&mac).is_none() {
         if let Some(&(seqid, _)) = com.data.mac_to_seqid_list.get(&mac).and_then(|x| x.last()) {
-            clear_task(com, seqid, mac)?;
+            clear_task(com, seqid + 1, mac)?;
+            com.data
+                .mac_to_seqid_list
+                .entry(mac)
+                .or_insert(vec![])
+                .push((seqid + 1, WRCPacketType::ClearJointData));
         } else {
             error!(
                 "找不到Mac地址为: {:X?} 的扳手的seqid, 扳手原有任务不清除",
@@ -106,6 +106,8 @@ fn send_task(
         }
         com.data.mac_to_joint_num.insert(mac, 0);
     }
+
+    let local = chrono::Local::now();
 
     com.data
         .mac_to_tasks
@@ -117,11 +119,66 @@ fn send_task(
             tasks: vec![],
         })
         .tasks
-        .extend_from_slice(&target);
+        .extend(target.iter().map(|x| ComTask {
+            msg_id: msg_id.clone(),
+            startup_time: local,
+            request: x.clone(),
+        }));
 
     task_info.status = true;
     tx.send(ResponseAction::TaskStatus(task_info))?;
 
+    Ok(())
+}
+
+fn cancel_task(com: &mut ComProcess, wrench_serial: String, task_id: String) -> anyhow::Result<()> {
+    let wrench_serial = match u128::from_str_radix(&wrench_serial, 16) {
+        Ok(s) => s,
+        Err(_) => {
+            bail!("wrench_serial值不合法");
+        }
+    };
+    let mac = match com.data.serial_to_mac.get(&wrench_serial) {
+        Some(&m) => m,
+        None => {
+            bail!("未知的wrench_serial");
+        }
+    };
+    let task = match com.data.mac_to_tasks.get_mut(&mac) {
+        Some(t) => t,
+        None => {
+            bail!("没有任务, 不需要取消任务");
+        }
+    };
+
+    if task
+        .tasks
+        .get(task.current as usize)
+        .map(|current| &current.request.task_id)
+        == Some(&task_id)
+    {
+        task.finished = true;
+    }
+
+    while task.current >= 0 {
+        if task
+            .tasks
+            .get(task.current as usize)
+            .map(|x| x.request.task_id == task_id)
+            .unwrap_or(true)
+        {
+            task.current -= 1;
+        } else {
+            break;
+        }
+    }
+
+    task.tasks.retain(|x| x.request.task_id != task_id);
+    info!(
+        "Mac地址为: {:X?} 的扳手的任务列表中删除了任务ID为: {} 的任务",
+        mac, task_id
+    );
+    info!("Mac地址为: {:X?} 的扳手的任务列表如下: {:?}", mac, task);
     Ok(())
 }
 
@@ -137,6 +194,9 @@ pub fn process_message_from_redis(
         RequiredAction::CheckConnect(target) => check_connect(com, target, tx)?,
         RequiredAction::SendTask((msg_id, target)) => {
             send_task(com, msg_id, target, tx)?;
+        }
+        RequiredAction::TaskCancel((wrench_serial, task_id)) => {
+            cancel_task(com, wrench_serial, task_id)?;
         }
     }
 

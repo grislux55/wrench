@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use chrono::{DateTime, Local};
+
 use crate::redis::message::TaskRequestMsg;
 
 #[derive(Debug, Clone, Default)]
@@ -28,6 +30,7 @@ pub enum RequiredAction {
     BindWrench(WrenchInfo),
     CheckConnect(ConnectInfo),
     SendTask((String, Vec<TaskRequestMsg>)),
+    TaskCancel((String, String)),
 }
 
 impl Display for RequiredAction {
@@ -36,8 +39,22 @@ impl Display for RequiredAction {
             RequiredAction::BindWrench(_) => write!(f, "RequiredAction::BindWrench"),
             RequiredAction::CheckConnect(_) => write!(f, "RequiredAction::CheckConnect"),
             RequiredAction::SendTask(_) => write!(f, "RequiredAction::SendTask"),
+            RequiredAction::TaskCancel(_) => write!(f, "RequiredAction::TaskCancel"),
         }
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct FinishedInfo {
+    pub msg_id: String,
+    pub wrench_serial: u128,
+    pub task_id: String,
+    pub task_detail_id: String,
+    pub torque: String,
+    pub angle: String,
+    pub status: bool,
+    pub start_date: DateTime<Local>,
+    pub end_date: DateTime<Local>,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +62,7 @@ pub enum ResponseAction {
     BindResponse(WrenchInfo),
     ConnectStatus(ConnectInfo),
     TaskStatus(TaskInfo),
+    TaskFinished(FinishedInfo),
 }
 
 impl Display for ResponseAction {
@@ -53,6 +71,7 @@ impl Display for ResponseAction {
             ResponseAction::BindResponse(_) => write!(f, "ResponseAction::BindResponse"),
             ResponseAction::ConnectStatus(_) => write!(f, "ResponseAction::ConnectStatus"),
             ResponseAction::TaskStatus(_) => write!(f, "ResponseAction::TaskStatus"),
+            ResponseAction::TaskFinished(_) => write!(f, "ResponseAction::TaskFinished"),
         }
     }
 }

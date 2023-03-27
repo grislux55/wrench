@@ -7,11 +7,14 @@ use std::{
     time::Duration,
 };
 
-use crate::message::{RequiredAction, ResponseAction};
+use crate::{
+    app_data::AppConfig,
+    message::{RequiredAction, ResponseAction},
+};
 
 use bus::Bus;
 use std::sync::Arc;
-use tracing::{debug, error, info, span, Level};
+use tracing::{error, info, span, Level};
 
 use super::com_process;
 
@@ -38,6 +41,7 @@ pub fn loop_query(
     exit_required: Arc<AtomicBool>,
     tx: mpsc::Sender<ResponseAction>,
     bus: Arc<Mutex<Bus<RequiredAction>>>,
+    config: AppConfig,
 ) {
     let mut com_thread_handles: Vec<(String, JoinHandle<()>)> = vec![];
 
@@ -54,15 +58,15 @@ pub fn loop_query(
                 continue;
             }
         };
-        debug!(
-            "当前所有串口: {:?}",
-            ports
-                .iter()
-                .map(|p| p.port_name.clone())
-                .collect::<Vec<_>>()
-        );
 
         for p in ports.iter() {
+            if config
+                .port
+                .iter()
+                .all(|c| c.as_str() != p.port_name.as_str())
+            {
+                continue;
+            }
             if com_thread_handles
                 .iter()
                 .any(|(port, _)| port == &p.port_name)

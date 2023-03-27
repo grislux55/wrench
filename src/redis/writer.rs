@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::message::ResponseAction;
 use crate::redis::message::{
     BindResponse, BindResponseMsg, ConnectResponse, ConnectResponseMsg, TaskResponse,
-    TaskResponseMsg,
+    TaskResponseMsg, TaskStatus, TaskStatusMsg,
 };
 use crate::AppConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -88,6 +88,30 @@ fn main_loop(
                             }
                             .to_string(),
                             msg_id: info.msg_id,
+                        },
+                    };
+                    publish_msg(&mut con, config.database.queue.as_str(), task_response)?;
+                }
+                ResponseAction::TaskFinished(info) => {
+                    let task_response = TaskStatus {
+                        msg_id: Uuid::new_v4().simple().to_string(),
+                        handler_name: "TOPIC_WRENCH_WORK_COLLECTION_RECEIVE".to_string(),
+                        current_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        msg_txt: TaskStatusMsg {
+                            msg_id: info.msg_id,
+                            task_id: info.task_id,
+                            task_detail_id: info.task_detail_id,
+                            wrench_serial: format!("{:X}", info.wrench_serial),
+                            torque: info.torque,
+                            angle: info.angle,
+                            status: if info.status { "0" } else { "1" }.to_string(),
+                            consume_time: (info.end_date - info.start_date)
+                                .num_seconds()
+                                .to_string(),
+                            desc: if info.status { "通过" } else { "不通过" }.to_string(),
+                            start_date: info.start_date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                            end_date: info.end_date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                            work_time: info.start_date.format("%Y-%m-%d %H:%M:%S").to_string(),
                         },
                     };
                     publish_msg(&mut con, config.database.queue.as_str(), task_response)?;

@@ -12,7 +12,7 @@ use tracing::{debug, error, info};
 use super::message::ConnectRequest;
 use crate::{
     message::{ConnectInfo, RequiredAction, WrenchInfo},
-    redis::message::{BindRequest, TaskRequest},
+    redis::message::{BindRequest, TaskCancel, TaskRequest},
     AppConfig,
 };
 use std::sync::Arc;
@@ -123,10 +123,27 @@ fn main_loop(
                     RequiredAction::SendTask((task_request.msg_id, task_request.msg_txt)),
                 )?;
             }
+            Some(Value::String(s)) if s == "TOPIC_WRENCH_TASK_CANCEL" => {
+                let task_cancel: TaskCancel = match serde_json::from_str(&payload) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("错误的 Json 格式, 原因: {}", e);
+                        continue;
+                    }
+                };
+                send_action(
+                    tx,
+                    RequiredAction::TaskCancel((
+                        task_cancel.msg_txt.wrench_serial,
+                        task_cancel.msg_txt.task_id,
+                    )),
+                )?;
+            }
             Some(Value::String(s))
-                if s == "TOPIC_WRENCH_SERIAL_INIT_RECEIVE"
+                if s == "TOPIC_WRENCH_SERIAL_INIT_ASK"
                     || s == "TOPIC_WRENCH_CONNECTION_ASK"
-                    || s == "TOPIC_WRENCH_TASK_UP_ASK" => {}
+                    || s == "TOPIC_WRENCH_TASK_UP_ASK"
+                    || s == "TOPIC_WRENCH_WORK_COLLECTION_RECEIVE" => {}
             _ => {
                 error!("未知的消息格式");
             }

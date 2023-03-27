@@ -4,7 +4,6 @@ mod redis;
 
 use std::{
     collections::HashMap,
-    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, Sender},
@@ -16,7 +15,6 @@ use std::{
 
 use anyhow::bail;
 use bus::BusReader;
-use num_bigfloat::BigFloat;
 
 use tracing::{debug, error, info, span, Level};
 
@@ -27,13 +25,36 @@ use crate::{
 };
 
 use self::{
-    message::process_com_message, port::read_write_loop, redis::process_message_from_redis,
+    message::{process_com_message, query_serial},
+    port::read_write_loop,
+    redis::process_message_from_redis,
 };
 
 use super::message::wrc::{
     WRCPacket, WRCPacketType, WRCPayloadGetJointData, WRCPayloadInlineJointData,
     WRCPayloadSetJoint, WRCPayloadSetJointFlag,
 };
+
+fn parse_float(s: &str, mut scale: i32) -> anyhow::Result<i32> {
+    let mut s = s.split('.');
+    let mut int_side = s.next().unwrap_or("0").parse::<i32>()?;
+    let mut dec_side = s.next().unwrap_or("0");
+    while scale > 0 {
+        scale -= 1;
+        int_side *= 10;
+        if dec_side.is_empty() {
+            continue;
+        }
+        int_side += dec_side
+            .chars()
+            .next()
+            .unwrap_or('0')
+            .to_digit(10)
+            .unwrap_or(0) as i32;
+        dec_side = dec_side.get(1..).unwrap_or("");
+    }
+    Ok(int_side)
+}
 
 fn send_task(
     task: &TaskRequestMsg,
@@ -42,114 +63,53 @@ fn send_task(
     sender: &mpsc::Sender<WRCPacket>,
 ) -> anyhow::Result<()> {
     let torque = {
-        if task.torque.is_none() {
-            bail!("torque不能为空");
-        }
-        match BigFloat::from_str(task.torque.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(1000);
-                t.to_i128().unwrap() as i32
-            }
+        match parse_float(&task.torque, 3) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析torque: {e}"),
         }
     };
     let torque_angle_start = {
-        if task.torque_angle_start.is_none() {
-            bail!("torque_angle_start不能为空");
-        }
-        match BigFloat::from_str(task.torque_angle_start.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(1000);
-                t.to_i128().unwrap() as i32
-            }
+        match parse_float(&task.torque_angle_start, 3) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析torque_angle_start: {e}"),
         }
     };
     let torque_upper_tol = {
-        if task.torque_deviation_up.is_none() {
-            bail!("torque_deviation_up不能为空");
-        }
-        match BigFloat::from_str(task.torque_deviation_up.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(1000);
-                t.to_i128().unwrap() as i32
-            }
+        match parse_float(&task.torque_deviation_up, 3) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析torque_deviation_up: {e}"),
         }
     };
     let torque_lower_tol = {
-        if task.torque_deviation_down.is_none() {
-            bail!("torque_deviation_down不能为空");
-        }
-        match BigFloat::from_str(task.torque_deviation_down.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(1000);
-                t.to_i128().unwrap() as i32
-            }
+        match parse_float(&task.torque_deviation_down, 3) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析torque_deviation_down: {e}"),
         }
     };
     let angle = {
-        if task.angle.is_none() {
-            bail!("angle不能为空");
-        }
-        match BigFloat::from_str(task.angle.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(10);
-                t.to_i128().unwrap() as i16
-            }
+        match parse_float(&task.angle, 1) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析angle: {e}"),
         }
     };
     let angle_upper_tol = {
-        if task.angle_deviation_up.is_none() {
-            bail!("angle_deviation_up不能为空");
-        }
-        match BigFloat::from_str(task.angle_deviation_up.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(10);
-                t.to_i128().unwrap() as i16
-            }
+        match parse_float(&task.angle_deviation_up, 1) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析angle_deviation_up: {e}"),
         }
     };
     let angle_lower_tol = {
-        if task.angle_deviation_down.is_none() {
-            bail!("angle_deviation_down不能为空");
-        }
-        match BigFloat::from_str(task.angle_deviation_down.as_ref().unwrap()) {
-            Ok(mut t) => {
-                t *= BigFloat::from(10);
-                t.to_i128().unwrap() as i16
-            }
+        match parse_float(&task.angle_deviation_down, 1) {
+            Ok(t) => t,
             Err(e) => bail!("无法解析angle_deviation_down: {e}"),
         }
     };
-    let task_repeat_times = {
-        if task.bolt_num.is_none() {
-            bail!("bolt_num不能为空");
-        }
-        task.bolt_num.as_ref().unwrap().parse::<u16>()?
-    };
-    let task_id = {
-        if task.task_id.is_none() {
-            bail!("task_id不能为空");
-        }
-        task.task_id.as_ref().unwrap().parse::<u16>()?
-    };
+    let task_repeat_times = { task.bolt_num.parse::<u16>()? };
+    let task_id = { task.task_id.parse::<u16>()? };
     let mut task_flag = WRCPayloadSetJointFlag(0);
-    if task.work_mode.is_none() {
-        bail!("work_mode不能为空");
-    }
-    task_flag.set_mode(task.work_mode.as_ref().unwrap().parse::<u8>()?);
-    if task.control_mode.is_none() {
-        bail!("control_mode不能为空");
-    }
-    task_flag.set_method(task.control_mode.as_ref().unwrap().parse::<u8>()?);
-    if task.unit.is_none() {
-        bail!("unit不能为空");
-    }
-    task_flag.set_unit(task.unit.as_ref().unwrap().parse::<u8>()?);
+    task_flag.set_mode(task.work_mode.parse::<u8>()?);
+    task_flag.set_method(task.control_mode.parse::<u8>()?);
+    task_flag.set_unit(task.unit.parse::<u8>()?);
 
     let mut wrc_flag = WRCPacketFlag(0);
     wrc_flag.set_direction(true);
@@ -164,9 +124,9 @@ fn send_task(
             torque_angle_start,
             torque_upper_tol,
             torque_lower_tol,
-            angle,
-            angle_upper_tol,
-            angle_lower_tol,
+            angle: angle as i16,
+            angle_upper_tol: angle_upper_tol as i16,
+            angle_lower_tol: angle_lower_tol as i16,
             fdt: -1,
             fda: -1,
             task_repeat_times,
@@ -204,11 +164,19 @@ fn get_joint_data(
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+pub struct ComTask {
+    pub startup_time: chrono::DateTime<chrono::Local>,
+    pub msg_id: String,
+    pub request: TaskRequestMsg,
+}
+
+#[derive(Debug, Clone)]
 pub struct PendingTask {
     pub finished: bool,
     pub current: i32,
     pub current_task_id: u16,
-    pub tasks: Vec<TaskRequestMsg>,
+    pub tasks: Vec<ComTask>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -237,6 +205,15 @@ pub struct ComProcessData {
 }
 
 fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow::Result<()> {
+    for (mac, lhb) in com.data.last_heart_beat.iter() {
+        if lhb.elapsed() >= Duration::from_secs(30) {
+            query_serial(*mac, &com.writer)?;
+        }
+    }
+    com.data
+        .last_heart_beat
+        .retain(|_, v| v.elapsed() <= Duration::from_secs(35));
+
     com.data.connection_pending = com
         .data
         .connection_pending
@@ -276,7 +253,18 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
             }
         };
 
-        if let Some(t) = task.tasks.get_mut(task.current as usize) {
+        if let Some(com_task) = task.tasks.get_mut(task.current as usize) {
+            let torque = parse_float(&com_task.request.torque, 3).unwrap_or_default();
+            let torque_up =
+                parse_float(&com_task.request.torque_deviation_up, 3).unwrap_or_default();
+            let torque_down =
+                parse_float(&com_task.request.torque_deviation_down, 3).unwrap_or_default();
+            let torque_range = (torque - torque_down)..=(torque + torque_up);
+            let angle = parse_float(&com_task.request.angle, 1).unwrap_or_default();
+            let angle_up = parse_float(&com_task.request.angle_deviation_up, 1).unwrap_or_default();
+            let angle_down =
+                parse_float(&com_task.request.angle_deviation_down, 1).unwrap_or_default();
+            let angle_range = (angle - angle_down)..=(angle + angle_up);
             let ok_num = com
                 .data
                 .mac_to_joints
@@ -285,14 +273,23 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
                     joints
                         .iter()
                         .filter(|j| j.task_id == task.current_task_id)
-                        .filter(|j| j.flag.is_ok())
+                        .filter(|j| {
+                            if com_task.request.work_mode == "0" {
+                                torque_range.contains(&j.torque)
+                            } else if com_task.request.work_mode == "1" {
+                                angle_range.contains(&(j.angle as i32))
+                            } else {
+                                torque_range.contains(&j.torque)
+                                    && angle_range.contains(&(j.angle as i32))
+                            }
+                        })
                         .count()
                 })
                 .unwrap_or_default();
             if ok_num
-                == t.bolt_num
-                    .as_ref()
-                    .unwrap_or(&"0".to_string())
+                == com_task
+                    .request
+                    .bolt_num
                     .parse::<usize>()
                     .unwrap_or_default()
             {
@@ -323,7 +320,7 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
                     .entry(*mac)
                     .or_insert(Instant::now())
                     .elapsed()
-                    < Duration::from_secs(5)
+                    >= Duration::from_secs(2)
             {
                 com.data.mac_to_query_timestamp.insert(*mac, Instant::now());
                 if let Err(e) =
@@ -352,17 +349,18 @@ fn com_update(com: &mut ComProcess, tx: &mpsc::Sender<ResponseAction>) -> anyhow
         task.finished = false;
         task.current_task_id += 1;
 
-        let mut task_request = task.tasks[task.current as usize].clone();
+        let mut com_task = task.tasks[task.current as usize].clone();
+        info!(
+            "开始执行任务ID: {}, 子ID: {}, 映射到任务ID: {}",
+            com_task.request.task_id, com_task.request.task_detail_id, task.current_task_id
+        );
         com.data
             .mac_to_task_id_map
             .entry(*mac)
             .or_insert(HashMap::new())
-            .insert(
-                task.current_task_id,
-                task_request.task_id.unwrap_or("0".to_string()),
-            );
-        task_request.task_id = Some(task.current_task_id.to_string());
-        if let Err(e) = send_task(&task_request, seqid + 1, *mac, &com.writer) {
+            .insert(task.current_task_id, com_task.request.task_id);
+        com_task.request.task_id = task.current_task_id.to_string();
+        if let Err(e) = send_task(&com_task.request, seqid + 1, *mac, &com.writer) {
             error!("发送任务失败: {}", e);
         } else {
             match com.data.mac_to_seqid_list.get_mut(mac) {
@@ -411,14 +409,14 @@ pub fn com_process<'a>(
     info!("启动处理循环");
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(wrc) = com.reader.try_recv() {
-            debug!("收到串口消息: {:?}", wrc);
-            if let Err(e) = process_com_message(&mut com, &wrc) {
+            debug!("收到串口消息: {:02X?}", wrc);
+            if let Err(e) = process_com_message(&mut com, &wrc, &tx) {
                 error!("处理串口消息失败: {}", e);
             }
         }
 
         if let Ok(action) = rx.try_recv() {
-            debug!("收到 Redis 消息: {:?}", action);
+            debug!("收到 Redis 消息: {:02X?}", action);
             if let Err(e) = process_message_from_redis(&mut com, action, &tx) {
                 error!("处理 Redis 消息失败: {}", e);
             }

@@ -13,6 +13,7 @@ pub struct Cli {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     pub database: DataBase,
+    pub port: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

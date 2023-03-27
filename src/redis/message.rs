@@ -70,28 +70,28 @@ pub struct ConnectResponse {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRequestMsg {
-    pub station_ip: Option<String>,
-    pub task_id: Option<String>,
-    pub task_detail_id: Option<String>,
+    pub station_ip: String,
+    pub task_id: String,
+    pub task_detail_id: String,
     pub task_desc: Option<String>,
-    pub wrench_serial: Option<String>,
+    pub wrench_serial: String,
     pub wrench_serial_desc: Option<String>,
     pub user_id: Option<String>,
     pub user_desc: Option<String>,
-    pub control_mode: Option<String>,
-    pub work_mode: Option<String>,
-    pub bolt_num: Option<String>,
-    pub repeat_count: Option<String>,
-    pub target: Option<String>,
-    pub monitor: Option<String>,
-    pub torque: Option<String>,
-    pub torque_deviation_up: Option<String>,
-    pub torque_deviation_down: Option<String>,
-    pub torque_angle_start: Option<String>,
-    pub angle: Option<String>,
-    pub angle_deviation_up: Option<String>,
-    pub angle_deviation_down: Option<String>,
-    pub unit: Option<String>,
+    pub control_mode: String,
+    pub work_mode: String,
+    pub bolt_num: String,
+    pub repeat_count: String,
+    pub target: String,
+    pub monitor: String,
+    pub torque: String,
+    pub torque_deviation_up: String,
+    pub torque_deviation_down: String,
+    pub torque_angle_start: String,
+    pub angle: String,
+    pub angle_deviation_up: String,
+    pub angle_deviation_down: String,
+    pub unit: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -124,26 +124,41 @@ pub struct TaskResponse {
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatusMsg {
-    pub msg_id: Option<String>,
-    pub task_id: Option<String>,
-    pub task_detail_id: Option<String>,
-    pub wrench_serial: Option<String>,
-    pub torque: Option<String>,
-    pub angle: Option<String>,
-    pub status: Option<String>,
-    pub consume_time: Option<String>,
-    pub desc: Option<String>,
-    pub start_date: Option<String>,
-    pub end_date: Option<String>,
-    pub work_time: Option<String>,
-    pub current_time: Option<String>,
+    pub msg_id: String,
+    pub task_id: String,
+    pub task_detail_id: String,
+    pub wrench_serial: String,
+    pub torque: String,
+    pub angle: String,
+    pub status: String,
+    pub consume_time: String,
+    pub desc: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub work_time: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatus {
     pub msg_id: String,
-    pub msg_type: String,
     pub handler_name: String,
+    pub current_time: String,
     pub msg_txt: TaskStatusMsg,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskCancelMsg {
+    pub task_id: String,
+    pub wrench_serial: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskCancel {
+    pub msg_id: String,
+    pub handler_name: String,
+    pub current_time: String,
+    pub msg_txt: TaskCancelMsg,
 }
