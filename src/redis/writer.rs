@@ -111,7 +111,7 @@ fn main_loop(
                             desc: if info.status { "通过" } else { "不通过" }.to_string(),
                             start_date: info.start_date.format("%Y-%m-%d %H:%M:%S").to_string(),
                             end_date: info.end_date.format("%Y-%m-%d %H:%M:%S").to_string(),
-                            work_time: info.start_date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                            work_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         },
                     };
                     publish_msg(&mut con, config.database.queue.as_str(), task_response)?;

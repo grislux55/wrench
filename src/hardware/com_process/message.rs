@@ -173,7 +173,7 @@ fn process_inline_joint_data(
 
         target.push(recv.clone());
 
-        match com.data.mac_to_tasks.get(&wrc.mac) {
+        match com.data.mac_to_tasks.get_mut(&wrc.mac) {
             Some(pending) if !pending.finished && pending.current_task_id == recv.task_id => {
                 let com_task = pending.tasks[pending.current as usize].clone();
                 let wrench_serial =
@@ -210,6 +210,7 @@ fn process_inline_joint_data(
                     start_date: com_task.startup_time,
                     end_date: chrono::Local::now(),
                 }))?;
+                pending.tasks[pending.current as usize].startup_time = chrono::Local::now();
             }
             _ => (),
         }
