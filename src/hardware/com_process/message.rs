@@ -166,12 +166,12 @@ fn process_inline_joint_data(
     tx: &mpsc::Sender<ResponseAction>,
 ) -> Result<(), anyhow::Error> {
     let target = com.data.mac_to_joints.entry(wrc.mac).or_insert(vec![]);
-    for recv in inline_joint_data.iter() {
+    let mut inline_joint_data = inline_joint_data.to_vec();
+    inline_joint_data.sort_by_key(|x| x.joint_id);
+    for recv in inline_joint_data.into_iter() {
         if target.iter().any(|x| x.joint_id == recv.joint_id) {
             continue;
         }
-
-        target.push(recv.clone());
 
         match com.data.mac_to_tasks.get_mut(&wrc.mac) {
             Some(pending) if !pending.finished && pending.current_task_id == recv.task_id => {
@@ -209,11 +209,18 @@ fn process_inline_joint_data(
                     status,
                     start_date: com_task.startup_time,
                     end_date: chrono::Local::now(),
+                    task_sub_id: target
+                        .iter()
+                        .filter(|x| x.joint_id == recv.joint_id)
+                        .count()
+                        .to_string(),
                 }))?;
                 pending.tasks[pending.current as usize].startup_time = chrono::Local::now();
             }
             _ => (),
         }
+
+        target.push(recv);
     }
 
     Ok(())

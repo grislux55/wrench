@@ -50,6 +50,7 @@ pub struct FinishedInfo {
     pub wrench_serial: u128,
     pub task_id: String,
     pub task_detail_id: String,
+    pub task_sub_id: String,
     pub torque: String,
     pub angle: String,
     pub status: bool,

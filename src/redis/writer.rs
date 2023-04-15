@@ -101,6 +101,7 @@ fn main_loop(
                             msg_id: info.msg_id,
                             task_id: info.task_id,
                             task_detail_id: info.task_detail_id,
+                            task_sub_id: info.task_sub_id,
                             wrench_serial: format!("{:X}", info.wrench_serial),
                             torque: info.torque,
                             angle: info.angle,

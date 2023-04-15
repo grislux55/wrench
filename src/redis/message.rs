@@ -127,6 +127,7 @@ pub struct TaskStatusMsg {
     pub msg_id: String,
     pub task_id: String,
     pub task_detail_id: String,
+    pub task_sub_id: String,
     pub wrench_serial: String,
     pub torque: String,
     pub angle: String,
