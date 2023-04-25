@@ -190,9 +190,9 @@ fn process_inline_joint_data(
                 let angle_down =
                     parse_float(&com_task.request.angle_deviation_down, 1).unwrap_or_default();
                 let angle_range = (angle - angle_down)..=(angle + angle_up);
-                let status = if com_task.request.work_mode == "0" {
+                let status = if com_task.request.control_mode == "0" {
                     torque_range.contains(&recv.torque)
-                } else if com_task.request.work_mode == "1" {
+                } else if com_task.request.control_mode == "1" {
                     angle_range.contains(&(recv.angle as i32))
                 } else {
                     torque_range.contains(&recv.torque)

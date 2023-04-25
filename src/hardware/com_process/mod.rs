@@ -107,8 +107,8 @@ fn send_task(
     let task_repeat_times = { task.bolt_num.parse::<u16>()? };
     let task_id = { task.task_id.parse::<u16>()? };
     let mut task_flag = WRCPayloadSetJointFlag(0);
-    task_flag.set_mode(task.work_mode.parse::<u8>()?);
-    task_flag.set_method(task.control_mode.parse::<u8>()?);
+    task_flag.set_mode(task.control_mode.parse::<u8>()?);
+    task_flag.set_method(task.work_mode.parse::<u8>()?);
     task_flag.set_unit(task.unit.parse::<u8>()?);
 
     let mut wrc_flag = WRCPacketFlag(0);
