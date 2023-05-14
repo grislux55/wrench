@@ -31,7 +31,7 @@ fn main_loop(
 ) -> anyhow::Result<()> {
     info!(
         "已在目标 Redis: {} 上的 {} 队列进行发布循环, 将在收取主线程的数据之后进行发布",
-        config.database.uri, config.database.queue
+        config.database.writer_uri, config.database.writer_queue
     );
     while !exit_required.load(Ordering::Acquire) {
         if let Ok(msg) = rx.try_recv() {
@@ -52,7 +52,11 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), bind_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        bind_response,
+                    )?;
                 }
                 ResponseAction::ConnectStatus(info) => {
                     let connect_response = ConnectResponse {
@@ -71,7 +75,11 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), connect_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        connect_response,
+                    )?;
                 }
                 ResponseAction::TaskStatus(info) => {
                     let task_response = TaskResponse {
@@ -90,7 +98,11 @@ fn main_loop(
                             msg_id: info.msg_id,
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), task_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        task_response,
+                    )?;
                 }
                 ResponseAction::TaskFinished(info) => {
                     let task_response = TaskStatus {
@@ -115,7 +127,11 @@ fn main_loop(
                             work_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), task_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        task_response,
+                    )?;
                 }
                 ResponseAction::ConnectionTimeout(info) => {
                     let timeout_response = MiscInfo {
@@ -138,7 +154,11 @@ fn main_loop(
                             msg_type: "3".to_string(),
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), timeout_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        timeout_response,
+                    )?;
                 }
                 ResponseAction::BasicStatus(info) => {
                     let basic_response = MiscInfo {
@@ -161,11 +181,13 @@ fn main_loop(
                             msg_type: "0".to_string(),
                         },
                     };
-                    publish_msg(&mut con, config.database.queue.as_str(), basic_response)?;
+                    publish_msg(
+                        &mut con,
+                        config.database.writer_queue.as_str(),
+                        basic_response,
+                    )?;
                 }
             }
-        } else {
-            std::thread::sleep(Duration::from_secs(1));
         }
     }
 
@@ -173,10 +195,10 @@ fn main_loop(
 }
 
 fn get_con(config: &AppConfig) -> anyhow::Result<redis::Connection> {
-    let client = redis::Client::open(config.database.uri.clone())?;
+    let client = redis::Client::open(config.database.writer_uri.clone())?;
     let con = client.get_connection()?;
 
-    info!("已连接到 Redis: {}", config.database.uri);
+    info!("已连接到 Redis: {}", config.database.writer_uri);
     Ok(con)
 }
 

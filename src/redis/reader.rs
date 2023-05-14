@@ -30,12 +30,12 @@ fn main_loop(
     tx: &mpsc::Sender<RequiredAction>,
 ) -> anyhow::Result<()> {
     let mut pubsub = con.as_pubsub();
-    pubsub.subscribe(&config.database.queue)?;
+    pubsub.subscribe(&config.database.reader_queue)?;
     pubsub.set_read_timeout(Some(std::time::Duration::from_secs(1)))?;
 
     info!(
         "已在目标 Redis: {} 上的 {} 队列进行订阅",
-        config.database.uri, config.database.queue
+        config.database.reader_uri, config.database.reader_queue
     );
     while !exit_required.load(Ordering::Acquire) {
         let msg = match pubsub.get_message() {
@@ -155,10 +155,10 @@ fn main_loop(
 }
 
 fn get_pubsub(config: &AppConfig) -> anyhow::Result<redis::Connection> {
-    let client = redis::Client::open(config.database.uri.clone())?;
+    let client = redis::Client::open(config.database.reader_uri.clone())?;
     let con = client.get_connection()?;
 
-    info!("已连接到 Redis: {}", config.database.uri);
+    info!("已连接到 Redis: {}", config.database.reader_uri);
     Ok(con)
 }
 

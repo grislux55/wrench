@@ -1,7 +1,9 @@
 {
   "database": {
-    "queue": "jeecg_redis_topic",
-    "uri": "redis://default:redispw@localhost:32768"
+    "reader_queue": "jeecg_redis_topic",
+    "writer_queue": "jeecg_redis_topic",
+    "reader_uri": "redis://default:wdnmd@192.168.238.139:6379",
+    "writer_uri": "redis://default:wdnmd@192.168.238.139:6379"
   },
-  "port": ["COM4"]
+  "port": ["COM5"]
 }

@@ -117,6 +117,7 @@ pub fn read_write_loop<'a>(
         }
 
         if let Ok(packet) = rx.try_recv() {
+            debug!("发送数据包: {packet:X?}");
             match TryInto::<Vec<u8>>::try_into(packet) {
                 Ok(data) => {
                     let encoded = sm7bits::encode(&data, SM7BitControlBits::WRC);

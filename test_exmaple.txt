@@ -1,0 +1,15 @@
+扳手绑定
+PUBLISH jeecg_redis_topic '{"msgId":"423423202301191551185746326","handlerName":"TOPIC_WRENCH_SERIAL_INIT","currentTime": "2023-01-19 15:51:18","msgTxt":{"stationIp":"10.23.0.1","productSerialNo":"RZN-BS1000H13T121"}}'
+PUBLISH jeecg_redis_topic '{"msgId":"423423202301191551185746326","handlerName":"TOPIC_WRENCH_SERIAL_INIT","currentTime": "2023-01-19 15:51:18","msgTxt":{"stationIp":"10.23.0.1","productSerialNo":"RZN-BS1000H13T122"}}'
+
+扳手连接测试
+PUBLISH jeecg_redis_topic '{"msgId": "4543670258677403","handlerName": "TOPIC_WRENCH_CONNECTION","currentTime": "2023-01-19 15:20:02","msgTxt": {"stationIp": "192.168.0.466","wrenchSerial": "FEF8241624076E8BE48B0A0812192855"}}'
+PUBLISH jeecg_redis_topic '{"msgId": "4543670258677403","handlerName": "TOPIC_WRENCH_CONNECTION","currentTime": "2023-01-19 15:20:02","msgTxt": {"stationIp": "192.168.0.466","wrenchSerial": "FEF8240A24266E9969100A0812192855"}}'
+
+扳手任务测试
+PUBLISH jeecg_redis_topic '{"msgId": "3453256356191522065440","handlerName": "TOPIC_WRENCH_TASK_UP_SEND","currentTime": "2023-01-19 15:22:09","msgTxt": [{"stationIp": "192.168.0.225","taskId": "1615625798604156930","taskDetailId": "1615612143439187969","taskDesc": "六角头螺栓M10*16","wrenchSerial": "FEF8241624076E8BE48B0A0812192855","controlMode": "0","workMode": "0","boltNum": "4","repeatCount": "1","target": "50","monitor": "10","torque": "20","torqueDeviationUp": "1","torqueDeviationDown": "1","torqueAngleStart": "1","angle": "10","angleDeviationUp": "2","angleDeviationDown": "2","unit": "0"}]}'
+PUBLISH jeecg_redis_topic '{"msgId": "3453256356191522065440","handlerName": "TOPIC_WRENCH_TASK_UP_SEND","currentTime": "2023-01-19 15:22:09","msgTxt": [{"stationIp": "192.168.0.225","taskId": "1615625798604156930","taskDetailId": "1615612143439187969","taskDesc": "六角头螺栓M10*16","wrenchSerial": "FEF8240A24266E9969100A0812192855","controlMode": "0","workMode": "0","boltNum": "4","repeatCount": "1","target": "50","monitor": "10","torque": "10","torqueDeviationUp": "1","torqueDeviationDown": "1","torqueAngleStart": "1","angle": "10","angleDeviationUp": "2","angleDeviationDown": "2","unit": "0"}]}'
+
+扳手任务取消测试
+PUBLISH jeecg_redis_topic '{"msgId": "532542345234523470","handlerName": "TOPIC_WRENCH_TASK_CANCEL","currentTime": "2023-01-19 15:50:16","msgTxt": {"wrenchSerial": "FEF8241624076E8BE48B0A0812192855","taskId": "1615625798604156930"}}'
+PUBLISH jeecg_redis_topic '{"msgId": "532542345234523470","handlerName": "TOPIC_WRENCH_TASK_CANCEL","currentTime": "2023-01-19 15:50:16","msgTxt": {"wrenchSerial": "FEF8240A24266E9969100A0812192855","taskId": "1615625798604156930"}}'

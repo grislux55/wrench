@@ -60,16 +60,13 @@ pub fn loop_query(
         };
 
         for p in ports.iter() {
+            if !com_thread_handles.is_empty() {
+                break;
+            }
             if config
                 .port
                 .iter()
                 .all(|c| c.as_str() != p.port_name.as_str())
-            {
-                continue;
-            }
-            if com_thread_handles
-                .iter()
-                .any(|(port, _)| port == &p.port_name)
             {
                 continue;
             }

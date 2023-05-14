@@ -18,6 +18,8 @@ pub struct AppConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DataBase {
-    pub queue: String,
-    pub uri: String,
+    pub reader_queue: String,
+    pub writer_queue: String,
+    pub reader_uri: String,
+    pub writer_uri: String,
 }
