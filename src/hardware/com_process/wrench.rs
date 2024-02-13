@@ -160,6 +160,24 @@ impl WrenchContext {
             for recv in inline_joint_data.into_iter() {
                 if recv.task_id != wrench_task.wrench_task_id {
                     debug!("不是属于该任务的task_id: {}", recv.task_id);
+
+                    let mut joint_has_recvd = false;
+                    for finished in self.finished_task.iter() {
+                        if finished
+                            .joints_recv
+                            .iter()
+                            .any(|x| x.joint_id == recv.joint_id as i32)
+                        {
+                            debug!("重复的joint_id: {}", recv.joint_id);
+                            joint_has_recvd = true;
+                            break;
+                        }
+                    }
+
+                    if !joint_has_recvd {
+                        debug!("不属于任务的task_id: {}", recv.task_id);
+                        self.total_joints += 1;
+                    }
                     continue;
                 }
 
